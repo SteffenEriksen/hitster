@@ -83,196 +83,7 @@
     </main>
   </div>
 
-  <!-- ════════════════════════════════════════════════════════ GAME SCREEN -->
-  <div id="screen-game" class="screen">
-    <!-- Top bar -->
-    <header class="game-header">
-      <div class="game-header-left">
-        <span class="current-team-label">Current team</span>
-        <span id="current-team-name" class="current-team-name">—</span>
-      </div>
-      <div class="game-header-center">
-        <span id="deck-counter" class="deck-counter">0 cards left</span>
-        <span id="tb-badge" class="tb-badge hidden">⚡ SUDDEN DEATH</span>
-        <div class="hard-mode-ctl">
-          <button id="btn-enable-hard"  class="btn-enable-hard hidden">🧠 Enable Hard Mode</button>
-          <div id="hard-enable-confirm" class="hard-enable-confirm hidden">
-            <span class="hard-enable-text">Enable hard mode on all turns?</span>
-            <button id="btn-hard-yes" class="btn-primary btn-sm">✓ Enable</button>
-            <button id="btn-hard-no"  class="btn-ghost  btn-sm">✗ Cancel</button>
-          </div>
-          <button id="btn-disable-hard" class="btn-disable-hard hidden">🧠 Hard Mode ON</button>
-          <div id="hard-disable-confirm" class="hard-enable-confirm hidden">
-            <span class="hard-enable-text">Disable hard mode?</span>
-            <button id="btn-hard-disable-yes" class="btn-primary btn-sm">✓ Disable</button>
-            <button id="btn-hard-disable-no"  class="btn-ghost  btn-sm">✗ Cancel</button>
-          </div>
-          <span id="hard-mode-badge" class="hard-mode-badge hidden"></span>
-        </div>
-      </div>
-      <div class="game-header-right">
-        <div id="score-chips" class="score-chips"></div>
-      </div>
-      <div id="game-playlist-info" class="game-playlist-info"></div>
-    </header>
-
-    <!-- Match point banner (visible when a team hits the winning threshold) -->
-    <div id="match-point-banner" class="match-point-banner hidden"></div>
-
-    <!-- Music controls (visible during a turn) -->
-    <div id="music-controls" class="music-controls hidden">
-      <div class="music-controls-inner">
-        <button id="btn-pause-resume" class="btn-music">⏸ Pause</button>
-        <button id="btn-restart" class="btn-music">⟳ Restart</button>
-        <div id="now-playing-info" class="now-playing-info"></div>
-        <button id="btn-discard" class="btn-discard hidden">🗑 Discard &amp; new card</button>
-        <div id="discard-confirm" class="discard-confirm hidden">
-          <span class="discard-confirm-text">Discard this card?</span>
-          <button id="btn-discard-yes" class="btn-primary btn-sm">✓ Yes</button>
-          <button id="btn-discard-no"  class="btn-discard btn-sm">✗ Cancel</button>
-        </div>
-      </div>
-      <div class="progress-bar-wrap" id="progress-bar-wrap">
-        <div id="progress-bar" class="progress-bar"></div>
-      </div>
-      <div id="progress-time" class="progress-time">0:00 / 0:00</div>
-      <!-- Playback error row — always full-width, never squeezed off-screen -->
-      <div id="playback-error-panel" class="playback-error-panel hidden">
-        <span id="playback-error-msg" class="playback-error-msg"></span>
-        <div class="playback-error-btns">
-          <button id="btn-retry-play" class="btn-playback">↺ Retry</button>
-          <button id="btn-skip-song"  class="btn-playback">⏭ New song</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- Current card area -->
-    <div id="card-area" class="card-area">
-      <!-- Face-down card (shown while music plays) -->
-      <div id="card-facedown" class="card card-facedown hidden">
-        <div class="card-inner">
-          <div class="card-back">🎵</div>
-        </div>
-      </div>
-
-      <!-- Reveal card (shown after confirm) -->
-      <div id="card-revealed" class="card card-revealed hidden">
-        <div class="card-year" id="reveal-year">—</div>
-        <div class="card-title" id="reveal-title">—</div>
-        <div class="card-artist" id="reveal-artist">—</div>
-      </div>
-
-      <!-- Result banner -->
-      <div id="result-banner" class="result-banner hidden">
-        <span id="result-text"></span>
-      </div>
-
-      <!-- Overturn (hard-mode only, after a failed hard-mode answer) -->
-      <div id="overturn-section" class="overturn-section hidden">
-        <button id="btn-overturn" class="btn-overturn">↩ Overturn decision</button>
-        <div id="overturn-confirm" class="overturn-confirm hidden">
-          <span class="overturn-confirm-text">Award card to <strong id="overturn-team-name"></strong>?</span>
-          <div class="overturn-confirm-btns">
-            <button id="btn-overturn-yes" class="btn-primary btn-sm">✓ Yes, overturn</button>
-            <button id="btn-overturn-no"  class="btn-ghost  btn-sm">✗ Cancel</button>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Decade reveal (shown after confirm) -->
-    <div id="decade-reveal" class="decade-reveal hidden">
-      <div id="decade-bg" class="decade-bg"></div>
-      <div class="decade-particles" id="decade-particles"></div>
-      <div class="decade-inner">
-        <img id="decade-art" class="decade-art" src="" alt="">
-        <div class="decade-text">
-          <div id="decade-emojis" class="decade-emojis"></div>
-          <div id="decade-era" class="decade-era"></div>
-          <div id="decade-label" class="decade-label"></div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Timeline -->
-    <div id="timeline-section" class="timeline-section">
-      <div id="current-team-bar" class="current-team-bar"></div>
-      <div id="timeline" class="timeline"></div>
-      <div id="other-teams" class="other-teams"></div>
-    </div>
-
-    <!-- Sudden-death tiebreaker overlay -->
-    <div id="sudden-death-overlay" class="sudden-death-overlay hidden">
-      <div class="sd-lightning-left">⚡</div>
-      <div class="sd-lightning-right">⚡</div>
-      <div class="sd-inner">
-        <div class="sd-skull">💀</div>
-        <h1 class="sd-title">SUDDEN DEATH</h1>
-        <p class="sd-sub">The game is tied. One final battle decides all.</p>
-        <div class="sd-vs" id="sd-vs"></div>
-        <button id="btn-sd-fight" class="btn-sd-fight">⚔️ Let's Fight!</button>
-      </div>
-    </div>
-
-    <!-- Starting cards overlay (shown once at game start) -->
-    <div id="starting-overlay" class="starting-overlay hidden">
-      <div class="starting-overlay-inner">
-        <h2 class="starting-title">🃏 Starting Cards Dealt!</h2>
-        <p class="starting-sub">Each team begins with one card on their timeline.</p>
-        <div id="starting-cards-grid" class="starting-cards-grid"></div>
-        <button id="btn-lets-play" class="btn-primary btn-large">Let's Play!</button>
-      </div>
-    </div>
-
-    <!-- Hard mode challenge overlay -->
-    <div id="hard-challenge" class="hard-challenge hidden">
-      <div class="hc-inner">
-        <div class="hc-badge">🧠 Hard Mode!</div>
-        <p class="hc-desc">Placement correct! Name the song to keep the card:</p>
-        <input id="hc-title"  class="hc-input" type="text" placeholder="Song title…"  autocomplete="off" spellcheck="false">
-        <input id="hc-artist" class="hc-input" type="text" placeholder="Artist name…" autocomplete="off" spellcheck="false">
-        <div class="hc-actions">
-          <button id="btn-hc-submit" class="btn-primary">✓ Submit</button>
-          <button id="btn-hc-skip"   class="btn-ghost"  >Give up</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- Action buttons -->
-    <footer class="game-footer">
-      <!-- Start Turn -->
-      <button id="btn-start-turn" class="btn-primary">▶ Start Turn</button>
-      <!-- Confirm Placement (hidden until slot selected) -->
-      <button id="btn-confirm" class="btn-confirm hidden">✓ Confirm Placement</button>
-      <!-- Next Team (after reveal) -->
-      <button id="btn-next-team" class="btn-next hidden">Next Team →</button>
-    </footer>
-  </div>
-
-  <!-- ══════════════════════════════════════════════════════ WINNER SCREEN -->
-  <div id="screen-winner" class="screen">
-    <canvas id="confetti-canvas"></canvas>
-    <div class="winner-bg-anim"></div>
-
-    <div class="winner-scroll">
-      <!-- Hero -->
-      <div class="winner-hero">
-        <div class="winner-emojis" id="winner-emojis">🎉🏆🎉</div>
-        <h1 class="winner-name" id="winner-title">Winner!</h1>
-        <p class="winner-subtitle" id="winner-subtitle"></p>
-      </div>
-
-      <!-- Song list (filled per winner) -->
-      <div id="winner-songs-wrap" class="winner-songs-wrap"></div>
-
-      <!-- Other teams -->
-      <div id="final-scores" class="final-scores"></div>
-
-      <button id="btn-play-again" class="btn-play-again">🎮 Play Again</button>
-    </div>
-  </div>
-
-  <!-- ══════════════════════════════════════════ OAUTH REQUIRED OVERLAY -->
+  <!-- ══════════════════════════════════════ OAUTH REQUIRED OVERLAY -->
   <div id="oauth-overlay" class="oauth-overlay hidden">
     <div class="oauth-overlay-card">
       <div class="oauth-overlay-icon">🎵</div>
@@ -283,7 +94,7 @@
     </div>
   </div>
 
-  <!-- ══════════════════════════════════════════ AUTH PANEL (localhost only) -->
+  <!-- ══════════════════════════════════════ AUTH PANEL (localhost only) -->
   <div id="auth-panel" class="auth-panel hidden">
     <div class="auth-panel-inner">
       <span id="auth-mode-label" class="auth-mode-label"></span>
@@ -292,7 +103,7 @@
     </div>
   </div>
 
-  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.2/dist/confetti.browser.min.js"></script>
+  <script src="common.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

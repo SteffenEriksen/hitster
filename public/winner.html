@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Hitster — Winner!</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- ══════════════════════════════════════════════════════ WINNER SCREEN -->
+  <div id="screen-winner" class="screen active">
+    <canvas id="confetti-canvas"></canvas>
+    <div class="winner-bg-anim"></div>
+
+    <div class="winner-scroll">
+      <!-- Hero -->
+      <div class="winner-hero">
+        <div class="winner-emojis" id="winner-emojis">🎉🏆🎉</div>
+        <h1 class="winner-name" id="winner-title">Winner!</h1>
+        <p class="winner-subtitle" id="winner-subtitle"></p>
+      </div>
+
+      <!-- Song list(s) for winner(s) -->
+      <div id="winner-songs-wrap" class="winner-songs-wrap"></div>
+
+      <!-- Other teams -->
+      <div id="final-scores" class="final-scores"></div>
+
+      <button id="btn-play-again" class="btn-play-again">🎮 Play Again</button>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.2/dist/confetti.browser.min.js"></script>
+  <script src="common.js"></script>
+  <script src="winner.js"></script>
+</body>
+</html>
