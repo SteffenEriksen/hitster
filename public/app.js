@@ -1535,41 +1535,20 @@ const authPanel = {
   },
 
   render(s) {
-    this.modeLabel.textContent = s.mode === 'oauth' ? '🔑 OAuth' : '🔧 MCP';
-    this.displayName.textContent = s.displayName ? '· ' + s.displayName : '';
+    this.modeLabel.textContent  = '';   // mode switcher removed — always OAuth
+    this.displayName.textContent = s.displayName ? s.displayName : '';
 
     const btns = [];
-    if (s.mode === 'mcp') {
-      btns.push('<button class="auth-btn" id="auth-btn-switch-oauth">Switch to OAuth</button>');
-    } else {
-      if (s.oauthLinked) {
-        btns.push('<button class="auth-btn" id="auth-btn-logout">Logout</button>');
-      } else if (!s.envAuth) {
-        btns.push('<button class="auth-btn" id="auth-btn-login">Login with Spotify</button>');
-      }
-      btns.push('<button class="auth-btn auth-btn-ghost" id="auth-btn-switch-mcp">Use MCP</button>');
+    if (s.oauthLinked) {
+      btns.push('<button class="auth-btn" id="auth-btn-logout">Logout</button>');
+    } else if (!s.envAuth) {
+      btns.push('<button class="auth-btn" id="auth-btn-login">Login with Spotify</button>');
     }
-    // Show refresh token copy helper when logged in and env var not yet set
     if (s.oauthLinked && s.refreshToken && !s.envAuth) {
       btns.push('<button class="auth-btn auth-btn-copy-rt" id="auth-btn-copy-rt" title="' + s.refreshToken + '">📋 Copy refresh token for Vercel</button>');
     }
     this.actions.innerHTML = btns.join('');
 
-    const btnSwitchOAuth = document.getElementById('auth-btn-switch-oauth');
-    if (btnSwitchOAuth) {
-      btnSwitchOAuth.addEventListener('click', async () => {
-        const s2 = await api.post('/auth/mode', { mode: 'oauth' });
-        if (!s2.oauthLinked) { location.href = '/auth/login'; return; }
-        this.render(s2);
-      });
-    }
-    const btnSwitchMcp = document.getElementById('auth-btn-switch-mcp');
-    if (btnSwitchMcp) {
-      btnSwitchMcp.addEventListener('click', async () => {
-        const s2 = await api.post('/auth/mode', { mode: 'mcp' });
-        this.render(s2);
-      });
-    }
     const btnLogin = document.getElementById('auth-btn-login');
     if (btnLogin) {
       btnLogin.addEventListener('click', () => { location.href = '/auth/login'; });
@@ -1586,7 +1565,7 @@ const authPanel = {
       btnCopyRt.addEventListener('click', () => {
         navigator.clipboard.writeText(btnCopyRt.title)
           .then(() => { btnCopyRt.textContent = '✓ Copied!'; setTimeout(() => { btnCopyRt.textContent = '📋 Copy refresh token for Vercel'; }, 2000); })
-          .catch(() => { prompt('Copy this refresh token and add it as SPOTIFY_REFRESH_TOKEN in Vercel:', btnCopyRt.title); });
+          .catch(() => { prompt('Copy this and add as SPOTIFY_REFRESH_TOKEN in Vercel:', btnCopyRt.title); });
       });
     }
   },
