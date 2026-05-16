@@ -572,6 +572,13 @@ app.get('/auth/status', (req, res) => {
   });
 });
 
+// Returns the Spotify client ID — safe to expose publicly; needed for client-side PKCE OAuth
+app.get('/auth/client-id', (req, res) => {
+  const creds = getClientCredentials();
+  if (!creds) return res.status(503).json({ error: 'Spotify credentials not configured' });
+  res.json({ clientId: creds.clientId });
+});
+
 app.post('/auth/mode', (req, res) => {
   const { mode } = req.body || {};
   if (mode !== 'mcp' && mode !== 'oauth') {

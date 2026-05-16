@@ -432,6 +432,50 @@ button { cursor: pointer; font-family: inherit; border: none; outline: none; }
 
 .playlist-info { font-size: 0.82rem; color: var(--grey-600); margin-top: 6px; }
 
+/* Personal Spotify */
+.personal-spotify-badge {
+  font-size: 0.7rem;
+  font-weight: 600;
+  background: var(--green-pale);
+  color: var(--green);
+  border-radius: 10px;
+  padding: 2px 8px;
+  vertical-align: middle;
+  margin-left: 6px;
+}
+.personal-spotify-desc {
+  font-size: 0.85rem;
+  color: var(--grey-600);
+  margin-bottom: 10px;
+  line-height: 1.45;
+}
+.personal-spotify-status { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.personal-spotify-name   { font-weight: 600; font-size: 0.9rem; color: var(--green-dark); }
+.btn-personal-connect {
+  background: #1DB954;
+  color: #fff;
+  font-weight: 700;
+  font-size: 0.88rem;
+  padding: 8px 20px;
+  border-radius: 20px;
+  border: none;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.btn-personal-connect:hover { background: #17a349; }
+.btn-personal-disconnect {
+  background: transparent;
+  border: 2px solid var(--grey-100);
+  color: var(--grey-600);
+  font-size: 0.82rem;
+  font-weight: 600;
+  padding: 5px 14px;
+  border-radius: 16px;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+.btn-personal-disconnect:hover { border-color: var(--red, #e53e3e); color: var(--red, #e53e3e); }
+
 /* Playlist tabs */
 .playlist-tabs {
   display: flex;

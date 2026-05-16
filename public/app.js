@@ -27,6 +27,164 @@ const api = {
   seek: (position_ms = 0) => api.post('/api/seek', { position_ms }),
 };
 
+// ─── Personal Spotify (client-side PKCE OAuth) ────────────────────────────────
+// Each player can optionally connect their own Spotify account.
+// Tokens live in localStorage — nothing goes to the server.
+// If connected, playback calls go directly to Spotify's API from this browser.
+// If not, playback falls back to the server's account (host/shared screen).
+
+const PKCE_STORAGE_KEY = 'hitster_personal_spotify';
+const PKCE_SCOPE = 'user-read-playback-state user-modify-playback-state';
+
+let _spotifyClientId = null;
+async function getSpotifyClientId() {
+  if (_spotifyClientId) return _spotifyClientId;
+  const data = await api.get('/auth/client-id');
+  _spotifyClientId = data.clientId;
+  return _spotifyClientId;
+}
+
+function pkceGenerateVerifier() {
+  const arr = new Uint8Array(32);
+  crypto.getRandomValues(arr);
+  return btoa(String.fromCharCode(...arr)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+async function pkceGenerateChallenge(verifier) {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier));
+  return btoa(String.fromCharCode(...new Uint8Array(digest))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+const personalSpotify = {
+  token:        null,
+  expiresAt:    null,
+  refreshToken: null,
+  displayName:  null,
+
+  load() {
+    try {
+      const d = JSON.parse(localStorage.getItem(PKCE_STORAGE_KEY) || 'null');
+      if (d) { this.token = d.token; this.expiresAt = d.expiresAt; this.refreshToken = d.refreshToken; this.displayName = d.displayName || null; }
+    } catch (_) {}
+  },
+
+  save() {
+    localStorage.setItem(PKCE_STORAGE_KEY, JSON.stringify({
+      token: this.token, expiresAt: this.expiresAt,
+      refreshToken: this.refreshToken, displayName: this.displayName,
+    }));
+  },
+
+  isConnected() { return !!(this.token || this.refreshToken); },
+
+  async getToken() {
+    if (this.token && this.expiresAt && Date.now() < this.expiresAt - 60000) return this.token;
+    if (!this.refreshToken) return null;
+    try {
+      const clientId = await getSpotifyClientId();
+      const body = new URLSearchParams({ grant_type: 'refresh_token', refresh_token: this.refreshToken, client_id: clientId });
+      const res  = await fetch('https://accounts.spotify.com/api/token', { method: 'POST', body, headers: { 'Content-Type': 'application/x-www-form-urlencoded' } });
+      const data = await res.json();
+      if (!data.access_token) { this.disconnect(); return null; }
+      this.token     = data.access_token;
+      this.expiresAt = Date.now() + data.expires_in * 1000;
+      if (data.refresh_token) this.refreshToken = data.refresh_token;
+      this.save();
+      return this.token;
+    } catch (_) { return null; }
+  },
+
+  async login() {
+    const clientId  = await getSpotifyClientId();
+    const verifier  = pkceGenerateVerifier();
+    const challenge = await pkceGenerateChallenge(verifier);
+    sessionStorage.setItem('pkce_verifier', verifier);
+    const params = new URLSearchParams({
+      client_id: clientId, response_type: 'code',
+      redirect_uri: location.origin + '/',
+      code_challenge_method: 'S256', code_challenge: challenge,
+      scope: PKCE_SCOPE, state: 'pkce_personal',
+    });
+    location.href = 'https://accounts.spotify.com/authorize?' + params.toString();
+  },
+
+  async handleCallback(code) {
+    const verifier = sessionStorage.getItem('pkce_verifier');
+    if (!verifier) return false;
+    sessionStorage.removeItem('pkce_verifier');
+    try {
+      const clientId = await getSpotifyClientId();
+      const body = new URLSearchParams({
+        grant_type: 'authorization_code', code,
+        redirect_uri: location.origin + '/',
+        client_id: clientId, code_verifier: verifier,
+      });
+      const res  = await fetch('https://accounts.spotify.com/api/token', { method: 'POST', body, headers: { 'Content-Type': 'application/x-www-form-urlencoded' } });
+      const data = await res.json();
+      if (!data.access_token) return false;
+      this.token     = data.access_token;
+      this.expiresAt = Date.now() + data.expires_in * 1000;
+      this.refreshToken = data.refresh_token;
+      // Fetch display name
+      const meRes = await fetch('https://api.spotify.com/v1/me', { headers: { 'Authorization': 'Bearer ' + this.token } });
+      const me    = await meRes.json();
+      this.displayName = me.display_name || me.id || 'Spotify user';
+      this.save();
+      return true;
+    } catch (_) { return false; }
+  },
+
+  disconnect() {
+    this.token = null; this.expiresAt = null; this.refreshToken = null; this.displayName = null;
+    localStorage.removeItem(PKCE_STORAGE_KEY);
+  },
+
+  async spotifyFetch(url, init = {}) {
+    const token = await this.getToken();
+    if (!token) return null;
+    init.headers = Object.assign({ 'Authorization': 'Bearer ' + token }, init.headers || {});
+    return fetch(url, init);
+  },
+};
+
+// ─── Playback wrappers ────────────────────────────────────────────────────────
+// Try personal token first; fall back to server API (host's account).
+
+async function spotifyPlay(uri) {
+  if (personalSpotify.isConnected()) {
+    const res = await personalSpotify.spotifyFetch('https://api.spotify.com/v1/me/player/play', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ uris: [uri] }),
+    });
+    if (res && res.ok) return;
+  }
+  await api.play(uri);
+}
+
+async function spotifyPause() {
+  if (personalSpotify.isConnected()) {
+    const res = await personalSpotify.spotifyFetch('https://api.spotify.com/v1/me/player/pause', { method: 'PUT' });
+    if (res && (res.ok || res.status === 204)) return;
+  }
+  await api.pause();
+}
+
+async function spotifyResume() {
+  if (personalSpotify.isConnected()) {
+    const res = await personalSpotify.spotifyFetch('https://api.spotify.com/v1/me/player/play', { method: 'PUT' });
+    if (res && (res.ok || res.status === 204)) return;
+  }
+  await api.resume();
+}
+
+async function spotifySeek(position_ms = 0) {
+  if (personalSpotify.isConnected()) {
+    const res = await personalSpotify.spotifyFetch(
+      'https://api.spotify.com/v1/me/player/seek?position_ms=' + position_ms, { method: 'PUT' });
+    if (res && (res.ok || res.status === 204)) return;
+  }
+  await api.seek(position_ms);
+}
+
 // ─── Year localStorage cache ──────────────────────────────────────────────────
 
 const YEAR_KEY = 'hitster_year_';
@@ -828,11 +986,10 @@ async function beginTurn() {
   renderTimeline(true);   // enable slots
 
   try {
-    await api.play(card.uri);
+    await spotifyPlay(card.uri);
     state.isPlaying = true;
     dom.btnPauseResume.textContent = '⏸ Pause';
     hidePlaybackError();
-    startProgress(card.duration);
   } catch (e) {
     state.isPlaying = false;
     dom.btnPauseResume.textContent = '▶ Resume';
@@ -856,7 +1013,7 @@ async function confirmPlacement() {
   dom.discardConfirm.classList.add('hidden');
 
   // Pause music
-  try { await api.pause(); } catch (_) {}
+  try { await spotifyPause(); } catch (_) {}
   state.isPlaying = false;
   stopProgress();
   dom.btnPauseResume.textContent = '▶ Resume';
@@ -1420,7 +1577,7 @@ dom.btnRetryPlay.addEventListener('click', async () => {
   dom.playbackErrPanel.classList.add('hidden');
   dom.nowPlayingInfo.textContent = '↺ Retrying…';
   try {
-    await api.play(state.currentCard.uri);
+    await spotifyPlay(state.currentCard.uri);
     state.isPlaying = true;
     dom.btnPauseResume.textContent = '⏸ Pause';
     hidePlaybackError();
@@ -1441,12 +1598,12 @@ dom.btnSkipSong.addEventListener('click', () => {
 dom.btnPauseResume.addEventListener('click', async () => {
   try {
     if (state.isPlaying) {
-      await api.pause();
+      await spotifyPause();
       state.isPlaying = false;
       pauseProgress();
       dom.btnPauseResume.textContent = '▶ Resume';
     } else {
-      await api.resume();
+      await spotifyResume();
       state.isPlaying = true;
       resumeProgress();
       dom.btnPauseResume.textContent = '⏸ Pause';
@@ -1458,11 +1615,11 @@ dom.btnPauseResume.addEventListener('click', async () => {
 
 dom.btnRestart.addEventListener('click', async () => {
   try {
-    await api.seek();
+    await spotifySeek();
     _playedMs = 0;
     _playStartTime = Date.now();
     if (!state.isPlaying) {
-      await api.resume();
+      await spotifyResume();
       state.isPlaying = true;
       dom.btnPauseResume.textContent = '⏸ Pause';
     }
@@ -1484,7 +1641,7 @@ dom.progressBarWrap.addEventListener('click', async (e) => {
   _tickProgress();
 
   try {
-    await api.seek(position_ms);
+    await spotifySeek(position_ms);
   } catch (err) {
     dom.nowPlayingInfo.textContent = '⚠ ' + err.message;
   }
@@ -1576,7 +1733,37 @@ const authPanel = {
   },
 };
 
+// ─── Personal Spotify UI ──────────────────────────────────────────────────────
+
+function updatePersonalSpotifyUI() {
+  const el = document.getElementById('personal-spotify-status');
+  if (!el) return;
+  if (personalSpotify.isConnected()) {
+    el.innerHTML =
+      '<span class="personal-spotify-name">🎵 ' + (personalSpotify.displayName || 'Connected') + '</span>' +
+      '<button class="btn-personal-disconnect" id="btn-personal-disconnect">Disconnect</button>';
+    document.getElementById('btn-personal-disconnect').addEventListener('click', () => {
+      personalSpotify.disconnect();
+      updatePersonalSpotifyUI();
+    });
+  } else {
+    el.innerHTML = '<button class="btn-personal-connect" id="btn-personal-connect">Connect Spotify</button>';
+    document.getElementById('btn-personal-connect').addEventListener('click', () => personalSpotify.login());
+  }
+}
+
 // ─── Boot ─────────────────────────────────────────────────────────────────────
+
+// Handle PKCE callback (Spotify redirects back with ?code=...&state=pkce_personal)
+(async () => {
+  const params = new URLSearchParams(location.search);
+  if (params.get('state') === 'pkce_personal' && params.get('code')) {
+    await personalSpotify.handleCallback(params.get('code'));
+    history.replaceState({}, '', '/');
+  }
+  personalSpotify.load();
+  updatePersonalSpotifyUI();
+})();
 
 initTeamInputs();
 loadMyPlaylists();
