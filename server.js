@@ -10,10 +10,10 @@ const https = require('https');
 // ─── Config ───────────────────────────────────────────────────────────────────
 
 const PORT = process.env.PORT || 3001;
-const SPOTIFY_CONFIG_PATH = path.join(
-  process.env.HOME,
-  '.raiwork/mcp/spotify-mcp-server/spotify-config.json'
-);
+const SPOTIFY_CONFIG_PATH = process.env.SPOTIFY_CONFIG_PATH ||
+  (process.env.HOME
+    ? path.join(process.env.HOME, '.raiwork/mcp/spotify-mcp-server/spotify-config.json')
+    : null);
 
 const app = express();
 app.use(express.static(path.join(__dirname, 'public')));
@@ -43,6 +43,7 @@ function localhostOnly(req, res, next) {
 // ─── Spotify token management ─────────────────────────────────────────────────
 
 function readSpotifyConfig() {
+  if (!SPOTIFY_CONFIG_PATH) return null;
   try {
     return JSON.parse(fs.readFileSync(SPOTIFY_CONFIG_PATH, 'utf8'));
   } catch (e) {
@@ -52,6 +53,7 @@ function readSpotifyConfig() {
 }
 
 function writeSpotifyConfig(config) {
+  if (!SPOTIFY_CONFIG_PATH) return;
   fs.writeFileSync(SPOTIFY_CONFIG_PATH, JSON.stringify(config, null, 2));
 }
 
