@@ -597,6 +597,12 @@ app.post('/auth/logout', (req, res) => {
 
 // ─── Start ────────────────────────────────────────────────────────────────────
 
-http.createServer(app).listen(PORT, () => {
-  console.log('Hitster running at http://localhost:' + PORT);
-});
+// Export for Vercel (serverless — Vercel creates the HTTP server itself)
+module.exports = app;
+
+// Local development: start the server directly
+if (require.main === module) {
+  http.createServer(app).listen(PORT, () => {
+    console.log('Hitster running at http://localhost:' + PORT);
+  });
+}
