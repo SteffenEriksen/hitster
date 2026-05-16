@@ -70,6 +70,40 @@ function getClientCredentials() {
   return config ? { clientId: config.clientId, clientSecret: config.clientSecret } : null;
 }
 
+/** True when all three Spotify env vars are present — no browser login needed. */
+function hasEnvAuth() {
+  return !!(process.env.SPOTIFY_CLIENT_ID &&
+            process.env.SPOTIFY_CLIENT_SECRET &&
+            process.env.SPOTIFY_REFRESH_TOKEN);
+}
+
+// In-memory cache for env-var token (lost on cold start, refreshed automatically)
+const envTokenCache = { accessToken: null, expiresAt: null };
+
+async function getAccessTokenFromEnv() {
+  const now = Date.now();
+  if (envTokenCache.accessToken && envTokenCache.expiresAt && now < envTokenCache.expiresAt - 60000) {
+    return envTokenCache.accessToken;
+  }
+  const body = new URLSearchParams({
+    grant_type:    'refresh_token',
+    refresh_token: process.env.SPOTIFY_REFRESH_TOKEN,
+    client_id:     process.env.SPOTIFY_CLIENT_ID,
+    client_secret: process.env.SPOTIFY_CLIENT_SECRET,
+  });
+  const data = await spotifyRequest({
+    url: 'https://accounts.spotify.com/api/token',
+    method: 'POST',
+    body: body.toString(),
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    noAuth: true,
+  });
+  envTokenCache.accessToken = data.access_token;
+  envTokenCache.expiresAt   = Date.now() + data.expires_in * 1000;
+  console.log('Spotify token refreshed (env)');
+  return envTokenCache.accessToken;
+}
+
 async function getAccessTokenMcp() {
   const config = readSpotifyConfig();
   if (!config) throw new Error('No Spotify config found');
@@ -138,7 +172,12 @@ async function getAccessTokenOAuth() {
 }
 
 function getAccessToken() {
-  return authMode === 'oauth' ? getAccessTokenOAuth() : getAccessTokenMcp();
+  if (authMode === 'oauth') {
+    if (oauthSession.accessToken) return getAccessTokenOAuth();
+    if (hasEnvAuth())             return getAccessTokenFromEnv();  // cold-start fallback
+    throw new Error('No Spotify session — log in at /auth/login');
+  }
+  return getAccessTokenMcp();
 }
 
 // ─── Generic Spotify HTTP helper ─────────────────────────────────────────────
@@ -279,10 +318,28 @@ function formatTrack(t) {
 
 const tracksCache = {};   // playlistId -> resolved track array (in-memory for session)
 
+// ─── Cookie restore ───────────────────────────────────────────────────────────
+// On Vercel (serverless), oauthSession is wiped on every cold start.
+// We persist the session in an httpOnly cookie so any warm instance can recover.
+app.use('/api', (req, _res, next) => {
+  if (!oauthSession.accessToken) {
+    try {
+      const raw = req.headers.cookie || '';
+      const match = raw.match(/hitster_session=([^;]+)/);
+      if (match) {
+        const data = JSON.parse(decodeURIComponent(match[1]));
+        if (data.accessToken && data.expiresAt > Date.now()) {
+          Object.assign(oauthSession, data);
+          if (authMode !== 'mcp') authMode = 'oauth';
+          console.log('Session restored from cookie for:', data.displayName);
+        }
+      }
+    } catch (_) {}
+  }
+  next();
+});
+
 // ─── Non-localhost auth promotion ─────────────────────────────────────────────
-// When accessed via a forwarded port (not localhost) and an OAuth session already
-// exists, automatically prefer OAuth over MCP.  The localhost auth panel can
-// always override this back to MCP if needed.
 app.use('/api', (req, res, next) => {
   if (!isLocalhost(req) && authMode === 'mcp' && oauthSession.accessToken) {
     authMode = 'oauth';
@@ -292,10 +349,10 @@ app.use('/api', (req, res, next) => {
 });
 
 // ─── OAuth required guard ─────────────────────────────────────────────────────
-// When in OAuth mode but the session has not been established yet, block all
-// API calls so the client can present a login prompt instead of silent errors.
+// Block API calls when OAuth mode is active but no session exists AND
+// no env-var fallback is configured.
 app.use('/api', (req, res, next) => {
-  if (authMode === 'oauth' && !oauthSession.accessToken) {
+  if (authMode === 'oauth' && !oauthSession.accessToken && !hasEnvAuth()) {
     return res.status(401).json({ error: 'Spotify login required', code: 'oauth_required' });
   }
   next();
@@ -509,6 +566,9 @@ app.get('/auth/status', (req, res) => {
     mode:         authMode,
     displayName:  authMode === 'mcp' ? 'MCP account' : (oauthSession.displayName || null),
     oauthLinked:  !!(oauthSession.accessToken),
+    envAuth:      hasEnvAuth(),
+    // Expose refresh token so the user can copy it into SPOTIFY_REFRESH_TOKEN on Vercel
+    refreshToken: oauthSession.refreshToken || null,
   });
 });
 
@@ -581,6 +641,20 @@ app.get('/auth/callback', async (req, res) => {
 
     authMode = 'oauth';
     console.log('OAuth login complete for:', oauthSession.displayName);
+
+    // Persist session in an httpOnly cookie so Vercel cold starts can restore it
+    const sessionPayload = encodeURIComponent(JSON.stringify({
+      accessToken:  oauthSession.accessToken,
+      refreshToken: oauthSession.refreshToken,
+      expiresAt:    oauthSession.expiresAt,
+      displayName:  oauthSession.displayName,
+    }));
+    res.cookie('hitster_session', sessionPayload, {
+      httpOnly: true,
+      secure:   true,
+      sameSite: 'lax',
+      maxAge:   30 * 24 * 60 * 60 * 1000,  // 30 days
+    });
     res.redirect('/');
   } catch (e) {
     console.error('OAuth callback error:', e.message);
@@ -593,6 +667,7 @@ app.post('/auth/logout', (req, res) => {
   oauthSession.refreshToken = null;
   oauthSession.expiresAt    = null;
   oauthSession.displayName  = null;
+  res.clearCookie('hitster_session');
   console.log('OAuth session cleared');
   res.json({ ok: true, mode: authMode, oauthLinked: false });
 });

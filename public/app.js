@@ -1544,10 +1544,14 @@ const authPanel = {
     } else {
       if (s.oauthLinked) {
         btns.push('<button class="auth-btn" id="auth-btn-logout">Logout</button>');
-      } else {
+      } else if (!s.envAuth) {
         btns.push('<button class="auth-btn" id="auth-btn-login">Login with Spotify</button>');
       }
       btns.push('<button class="auth-btn auth-btn-ghost" id="auth-btn-switch-mcp">Use MCP</button>');
+    }
+    // Show refresh token copy helper when logged in and env var not yet set
+    if (s.oauthLinked && s.refreshToken && !s.envAuth) {
+      btns.push('<button class="auth-btn auth-btn-copy-rt" id="auth-btn-copy-rt" title="' + s.refreshToken + '">📋 Copy refresh token for Vercel</button>');
     }
     this.actions.innerHTML = btns.join('');
 
@@ -1575,6 +1579,14 @@ const authPanel = {
       btnLogout.addEventListener('click', async () => {
         await api.post('/auth/logout');
         await this.refresh();
+      });
+    }
+    const btnCopyRt = document.getElementById('auth-btn-copy-rt');
+    if (btnCopyRt) {
+      btnCopyRt.addEventListener('click', () => {
+        navigator.clipboard.writeText(btnCopyRt.title)
+          .then(() => { btnCopyRt.textContent = '✓ Copied!'; setTimeout(() => { btnCopyRt.textContent = '📋 Copy refresh token for Vercel'; }, 2000); })
+          .catch(() => { prompt('Copy this refresh token and add it as SPOTIFY_REFRESH_TOKEN in Vercel:', btnCopyRt.title); });
       });
     }
   },
