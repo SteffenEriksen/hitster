@@ -60,11 +60,16 @@ const personalSpotify = {
   expiresAt:    null,
   refreshToken: null,
   displayName:  null,
+  imageUrl:     null,
 
   load() {
     try {
       const d = JSON.parse(localStorage.getItem(PKCE_STORAGE_KEY) || 'null');
-      if (d) { this.token = d.token; this.expiresAt = d.expiresAt; this.refreshToken = d.refreshToken; this.displayName = d.displayName || null; }
+      if (d) {
+        this.token = d.token; this.expiresAt = d.expiresAt;
+        this.refreshToken = d.refreshToken; this.displayName = d.displayName || null;
+        this.imageUrl = d.imageUrl || null;
+      }
     } catch (_) {}
   },
 
@@ -72,6 +77,7 @@ const personalSpotify = {
     localStorage.setItem(PKCE_STORAGE_KEY, JSON.stringify({
       token: this.token, expiresAt: this.expiresAt,
       refreshToken: this.refreshToken, displayName: this.displayName,
+      imageUrl: this.imageUrl,
     }));
   },
 
@@ -104,6 +110,7 @@ const personalSpotify = {
       redirect_uri: location.origin + '/',
       code_challenge_method: 'S256', code_challenge: challenge,
       scope: PKCE_SCOPE, state: 'pkce_personal',
+      show_dialog: 'true',   // always show account chooser
     });
     location.href = 'https://accounts.spotify.com/authorize?' + params.toString();
   },
@@ -122,20 +129,21 @@ const personalSpotify = {
       const res  = await fetch('https://accounts.spotify.com/api/token', { method: 'POST', body, headers: { 'Content-Type': 'application/x-www-form-urlencoded' } });
       const data = await res.json();
       if (!data.access_token) return false;
-      this.token     = data.access_token;
-      this.expiresAt = Date.now() + data.expires_in * 1000;
+      this.token        = data.access_token;
+      this.expiresAt    = Date.now() + data.expires_in * 1000;
       this.refreshToken = data.refresh_token;
-      // Fetch display name
       const meRes = await fetch('https://api.spotify.com/v1/me', { headers: { 'Authorization': 'Bearer ' + this.token } });
       const me    = await meRes.json();
       this.displayName = me.display_name || me.id || 'Spotify user';
+      this.imageUrl    = me.images?.[0]?.url || null;
       this.save();
       return true;
     } catch (_) { return false; }
   },
 
   disconnect() {
-    this.token = null; this.expiresAt = null; this.refreshToken = null; this.displayName = null;
+    this.token = null; this.expiresAt = null; this.refreshToken = null;
+    this.displayName = null; this.imageUrl = null;
     localStorage.removeItem(PKCE_STORAGE_KEY);
   },
 
@@ -1733,22 +1741,58 @@ const authPanel = {
   },
 };
 
-// ─── Personal Spotify UI ──────────────────────────────────────────────────────
+// ─── Profile button (top-right of setup screen) ───────────────────────────────
 
-function updatePersonalSpotifyUI() {
-  const el = document.getElementById('personal-spotify-status');
-  if (!el) return;
+function renderProfileButton() {
+  const wrap = document.getElementById('profile-btn-wrap');
+  if (!wrap) return;
+
   if (personalSpotify.isConnected()) {
-    el.innerHTML =
-      '<span class="personal-spotify-name">🎵 ' + (personalSpotify.displayName || 'Connected') + '</span>' +
-      '<button class="btn-personal-disconnect" id="btn-personal-disconnect">Disconnect</button>';
-    document.getElementById('btn-personal-disconnect').addEventListener('click', () => {
-      personalSpotify.disconnect();
-      updatePersonalSpotifyUI();
-    });
+    const img = personalSpotify.imageUrl
+      ? '<img src="' + personalSpotify.imageUrl + '" alt="" class="profile-btn-img">'
+      : '<span class="profile-btn-initials">' + (personalSpotify.displayName || '?').charAt(0).toUpperCase() + '</span>';
+    wrap.innerHTML =
+      '<div class="profile-btn-container">' +
+        '<button class="profile-btn" id="profile-btn" aria-haspopup="true">' + img + '</button>' +
+        '<div class="profile-dropdown hidden" id="profile-dropdown">' +
+          '<div class="profile-dropdown-name">🎵 ' + (personalSpotify.displayName || 'Spotify user') + '</div>' +
+          '<button class="profile-dropdown-logout" id="profile-btn-logout">Log out</button>' +
+        '</div>' +
+      '</div>';
   } else {
-    el.innerHTML = '<button class="btn-personal-connect" id="btn-personal-connect">Connect Spotify</button>';
-    document.getElementById('btn-personal-connect').addEventListener('click', () => personalSpotify.login());
+    wrap.innerHTML =
+      '<div class="profile-btn-container">' +
+        '<button class="profile-btn profile-btn-empty" id="profile-btn" title="Connect Spotify">' +
+          '<span class="profile-btn-icon">♪</span>' +
+        '</button>' +
+        '<div class="profile-dropdown hidden" id="profile-dropdown">' +
+          '<div class="profile-dropdown-name">Not connected</div>' +
+          '<button class="profile-dropdown-connect" id="profile-btn-connect">Connect Spotify</button>' +
+        '</div>' +
+      '</div>';
+  }
+
+  // Toggle dropdown
+  document.getElementById('profile-btn').addEventListener('click', (e) => {
+    e.stopPropagation();
+    document.getElementById('profile-dropdown').classList.toggle('hidden');
+  });
+  // Close on outside click
+  document.addEventListener('click', () => {
+    const dd = document.getElementById('profile-dropdown');
+    if (dd) dd.classList.add('hidden');
+  }, { once: false });
+
+  const btnLogout = document.getElementById('profile-btn-logout');
+  if (btnLogout) {
+    btnLogout.addEventListener('click', () => {
+      personalSpotify.disconnect();
+      renderProfileButton();
+    });
+  }
+  const btnConnect = document.getElementById('profile-btn-connect');
+  if (btnConnect) {
+    btnConnect.addEventListener('click', () => personalSpotify.login());
   }
 }
 
@@ -1762,10 +1806,9 @@ function updatePersonalSpotifyUI() {
     history.replaceState({}, '', '/');
   }
   personalSpotify.load();
-  updatePersonalSpotifyUI();
+  renderProfileButton();
 })();
 
 initTeamInputs();
 loadMyPlaylists();
-authPanel.init();
 

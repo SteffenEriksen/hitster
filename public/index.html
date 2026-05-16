@@ -11,8 +11,11 @@
   <!-- ═══════════════════════════════════════════════════════ SETUP SCREEN -->
   <div id="screen-setup" class="screen active">
     <header class="setup-header">
-      <div class="logo">🎵 Hitster</div>
-      <p class="tagline">Timeline song guessing game</p>
+      <div class="setup-header-left">
+        <div class="logo">🎵 Hitster</div>
+        <p class="tagline">Timeline song guessing game</p>
+      </div>
+      <div id="profile-btn-wrap" class="profile-btn-wrap"></div>
     </header>
 
     <main class="setup-main">
@@ -47,13 +50,6 @@
           <button id="btn-refresh-playlists" class="btn-ghost btn-icon" title="Refresh">↻</button>
         </div>
         <p id="playlist-info" class="playlist-info"></p>
-      </section>
-
-      <!-- Personal Spotify (optional per-device audio) -->
-      <section class="setup-section">
-        <h2>Personal Spotify <span class="personal-spotify-badge">Optional</span></h2>
-        <p class="personal-spotify-desc">Connect your own Spotify to hear music on your device. If you skip this, music plays through the host's account.</p>
-        <div id="personal-spotify-status" class="personal-spotify-status"></div>
       </section>
 
       <!-- Hard mode settings -->
