@@ -233,7 +233,7 @@ function renderOtherTeams() {
       ? `<span class="otr-empty">No cards yet</span>`
       : t.cards.map(c =>
           `<div class="otr-card">
-            <div class="otr-year" style="color:${getDecadeVibe(c.year).color}">${c.year}</div>
+            <div class="otr-year" style="color:${getDecadeVibe(c.year).color}">${c.yearUncertain ? '~' : ''}${c.year}</div>
             <div class="otr-title">${esc(c.title)}</div>
           </div>`
         ).join('');
@@ -263,7 +263,7 @@ function showStartingCards() {
     return `<div class="starting-card-row">
       <div class="starting-card-team">${esc(t.name)}</div>
       <div class="starting-card-info">
-        <div class="sc-year">${c ? c.year : '?'}</div>
+        <div class="sc-year">${c ? (c.yearUncertain ? '~' : '') + c.year : '?'}</div>
         <div class="sc-title">${esc(c ? c.title : '—')}</div>
         <div class="sc-artist">${esc(c ? c.artist : '')}</div>
       </div>
@@ -503,7 +503,8 @@ function finishPlacement(correct, slot, fromHardMode = false) {
   const card = state.currentCard;
   dom.nowPlayingInfo.textContent = card.title + ' – ' + card.artist;
   dom.cardFacedown.classList.add('hidden');
-  dom.revealYear.textContent   = card.year || '?';
+  dom.revealYear.textContent = (card.yearUncertain ? '~' : '') + (card.year || '?');
+  dom.revealYear.title = card.yearUncertain ? 'Year may be approximate — could not confirm via MusicBrainz' : '';
   dom.revealTitle.textContent  = card.title;
   dom.revealArtist.textContent = card.artist;
   dom.cardRevealed.classList.remove('hidden');
@@ -658,7 +659,7 @@ function renderTimeline(interactive) {
       cardEl.className = 'timeline-card large';
       const yearColor = getDecadeVibe(card.year).color;
       cardEl.innerHTML = `
-        <div class="tc-year" style="color:${yearColor}">${card.year}</div>
+        <div class="tc-year" style="color:${yearColor}"${card.yearUncertain ? ' title="Year may be approximate"' : ''}>${card.yearUncertain ? '~' : ''}${card.year}</div>
         <div class="tc-title">${esc(card.title)}</div>
         <div class="tc-artist">${esc(card.artist)}</div>
       `;

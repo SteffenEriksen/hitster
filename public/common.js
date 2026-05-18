@@ -165,7 +165,8 @@ async function spotifySeek(position_ms = 0) { await api.seek(position_ms); }
 
 // ─── Year localStorage cache ──────────────────────────────────────────────────
 
-const YEAR_KEY = 'hitster_year_';
+const YEAR_KEY      = 'hitster_year_';
+const YEAR_OK_KEY   = 'hitster_year_ok_';  // '1' = MB confirmed, '0' = fell back to album year
 
 function getYearCache(id) {
   const v = localStorage.getItem(YEAR_KEY + id);
@@ -174,6 +175,14 @@ function getYearCache(id) {
 
 function setYearCache(id, year) {
   try { localStorage.setItem(YEAR_KEY + id, String(year)); } catch (_) {}
+}
+
+function isYearConfirmed(id) {
+  return localStorage.getItem(YEAR_OK_KEY + id) === '1';
+}
+
+function setYearConfirmed(id, confirmed) {
+  try { localStorage.setItem(YEAR_OK_KEY + id, confirmed ? '1' : '0'); } catch (_) {}
 }
 
 /** Apply any cached years from localStorage to an array of tracks (mutates). */
@@ -185,18 +194,24 @@ function applyYearCache(tracks) {
 }
 
 /** Look up the definitive release year for a card via MusicBrainz.
- *  1. localStorage hit → return instantly (no network)
- *  2. card.isrc present → fetch /api/resolve-year-mb, cache result
+ *  Sets card.yearUncertain = true when the year could not be confirmed:
+ *    - MB lookup threw an error
+ *    - MB returned no year and the album date is suspect
+ *    - No ISRC and the album date is suspect
  *  Always mutates card.year if a better year is found. */
 async function resolveCardYearMb(card) {
   const cached = getYearCache(card.id);
   if (cached !== null) {
     card.year = cached;
+    card.yearUncertain = !isYearConfirmed(card.id);
     return cached;
   }
 
   if (!card.isrc) {
+    // No ISRC — can't verify via MB; uncertain only if the album itself is suspect
     setYearCache(card.id, card.year);
+    setYearConfirmed(card.id, !card.suspect);
+    card.yearUncertain = !!card.suspect;
     return card.year;
   }
 
@@ -204,12 +219,19 @@ async function resolveCardYearMb(card) {
     const data = await api.resolveYearMb(card.isrc);
     if (data.year) {
       setYearCache(card.id, data.year);
+      setYearConfirmed(card.id, true);
       card.year = data.year;
+      card.yearUncertain = false;
     } else {
+      // MB had no record — fall back to album year, mark uncertain if suspect
       setYearCache(card.id, card.year);
+      setYearConfirmed(card.id, !card.suspect);
+      card.yearUncertain = !!card.suspect;
     }
   } catch (e) {
     console.warn('[MB] year lookup failed for', card.title, ':', e.message);
+    // Don't cache on error (allow retry next draw), but flag as uncertain
+    card.yearUncertain = true;
   }
   return card.year;
 }
