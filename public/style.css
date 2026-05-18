@@ -1264,6 +1264,25 @@ button { cursor: pointer; font-family: inherit; border: none; outline: none; }
 }
 
 /* ─── Year correction section ─────────────────────────────────────────────── */
+.card-year-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+.btn-edit-year {
+  background: none;
+  border: none;
+  color: var(--grey-400, #9ca3af);
+  font-size: 0.75rem;
+  cursor: pointer;
+  padding: 2px 4px;
+  line-height: 1;
+  opacity: 0.5;
+  transition: opacity 0.15s, color 0.15s;
+  margin-top: 2px;
+}
+.btn-edit-year:hover { opacity: 1; color: var(--grey-600, #6b7280); }
 .year-edit-section {
   display: flex;
   flex-direction: column;

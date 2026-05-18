@@ -88,6 +88,7 @@ const dom = {
   yearEditInput:   $('year-edit-input'),
   btnYearConfirm:  $('btn-year-confirm'),
   btnYearDismiss:  $('btn-year-dismiss'),
+  btnEditYear:     $('btn-edit-year'),
 };
 
 // ─── Game state ───────────────────────────────────────────────────────────────
@@ -335,6 +336,7 @@ function enterPreTurn() {
   dom.overturnSection.classList.add('hidden');
   dom.overturnConfirm.classList.add('hidden');
   dom.yearEditSection.classList.add('hidden');
+  dom.btnEditYear.classList.add('hidden');
   hidePlaybackError();
   dom.suddenDeathOverlay.classList.add('hidden');
 
@@ -537,7 +539,8 @@ function finishPlacement(correct, slot, fromHardMode = false) {
   renderCurrentTeamBar();
   renderOtherTeams();
 
-  // If year is uncertain let players correct it before moving on
+  // Always show the subtle edit button; auto-open the section only when uncertain
+  dom.btnEditYear.classList.remove('hidden');
   if (card.yearUncertain) {
     dom.yearEditInput.value = card.year;
     dom.yearEditSection.classList.remove('hidden');
@@ -820,6 +823,12 @@ dom.btnOverturnNo.addEventListener('click', () => {
 dom.btnOverturnYes.addEventListener('click', overturnPlacement);
 
 // Year correction
+dom.btnEditYear.addEventListener('click', () => {
+  dom.yearEditInput.value = state.currentCard?.year || '';
+  dom.yearEditSection.classList.remove('hidden');
+  dom.yearEditInput.focus();
+  dom.yearEditInput.select();
+});
 dom.btnYearConfirm.addEventListener('click', () => {
   const newYear = parseInt(dom.yearEditInput.value, 10);
   if (!newYear || newYear < 1900 || newYear > 2030) return;
