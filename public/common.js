@@ -156,42 +156,12 @@ const personalSpotify = {
 };
 
 // ─── Playback wrappers ────────────────────────────────────────────────────────
-// Try personal token first; fall back to server API (host's account).
+// All playback goes through the server's logged-in Spotify account.
 
-async function spotifyPlay(uri) {
-  if (personalSpotify.isConnected()) {
-    const res = await personalSpotify.spotifyFetch('https://api.spotify.com/v1/me/player/play', {
-      method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ uris: [uri] }),
-    });
-    if (res && res.ok) return;
-  }
-  await api.play(uri);
-}
-
-async function spotifyPause() {
-  if (personalSpotify.isConnected()) {
-    const res = await personalSpotify.spotifyFetch('https://api.spotify.com/v1/me/player/pause', { method: 'PUT' });
-    if (res && (res.ok || res.status === 204)) return;
-  }
-  await api.pause();
-}
-
-async function spotifyResume() {
-  if (personalSpotify.isConnected()) {
-    const res = await personalSpotify.spotifyFetch('https://api.spotify.com/v1/me/player/play', { method: 'PUT' });
-    if (res && (res.ok || res.status === 204)) return;
-  }
-  await api.resume();
-}
-
-async function spotifySeek(position_ms = 0) {
-  if (personalSpotify.isConnected()) {
-    const res = await personalSpotify.spotifyFetch(
-      'https://api.spotify.com/v1/me/player/seek?position_ms=' + position_ms, { method: 'PUT' });
-    if (res && (res.ok || res.status === 204)) return;
-  }
-  await api.seek(position_ms);
-}
+async function spotifyPlay(uri)             { await api.play(uri); }
+async function spotifyPause()               { await api.pause(); }
+async function spotifyResume()              { await api.resume(); }
+async function spotifySeek(position_ms = 0) { await api.seek(position_ms); }
 
 // ─── Year localStorage cache ──────────────────────────────────────────────────
 
