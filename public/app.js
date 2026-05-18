@@ -23,8 +23,9 @@ function pickTeamName() {
 const tracksCache     = {};       // playlistId -> track[]
 let   infoFetchSeq    = 0;        // cancel stale fetches on fast playlist switching
 let   myPlaylistsCache      = null;
+let   allPlaylistsCache     = null;
 let   officialPlaylistsCache = null;
-let   activePlaylistTab     = 'my';   // 'my' | 'official'
+let   activePlaylistTab     = 'my';   // 'my' | 'all' | 'official'
 
 // ─── DOM refs (setup screen) ──────────────────────────────────────────────────
 
@@ -38,7 +39,10 @@ const dom = {
   playlistSelect: $('playlist-select'),
   btnRefresh:     $('btn-refresh-playlists'),
   tabMy:          $('tab-my'),
+  tabAll:         $('tab-all'),
   tabOfficial:    $('tab-official'),
+  playlistFilterWrap: $('playlist-filter-wrap'),
+  playlistFilter:     $('playlist-filter'),
   playlistInfo:   $('playlist-info'),
   btnStartGame:   $('btn-start-game'),
   setupError:     $('setup-error'),
@@ -95,12 +99,38 @@ async function loadOfficialPlaylists(forceReload) {
   }
 }
 
+async function loadAllPlaylists(forceReload) {
+  if (allPlaylistsCache && !forceReload) { applyAllPlaylistsFilter(); return; }
+  dom.playlistSelect.innerHTML = '<option value="">Loading…</option>';
+  dom.btnStartGame.disabled = true;
+  dom.setupError.textContent = '';
+  try {
+    allPlaylistsCache = await api.get('/api/all-playlists');
+    applyAllPlaylistsFilter();
+  } catch (e) {
+    dom.playlistSelect.innerHTML = '<option value="">Error loading playlists</option>';
+    dom.setupError.textContent = e.message;
+  }
+}
+
+function applyAllPlaylistsFilter() {
+  if (!allPlaylistsCache) return;
+  const q        = dom.playlistFilter.value.toLowerCase().trim();
+  const filtered = q ? allPlaylistsCache.filter(pl => pl.name.toLowerCase().includes(q)) : allPlaylistsCache;
+  setSelectOptions(filtered, false);
+}
+
 function switchPlaylistTab(tab) {
   activePlaylistTab = tab;
   dom.tabMy.classList.toggle('active', tab === 'my');
+  dom.tabAll.classList.toggle('active', tab === 'all');
   dom.tabOfficial.classList.toggle('active', tab === 'official');
-  if (tab === 'my') loadMyPlaylists(false);
-  else              loadOfficialPlaylists(false);
+  // Show filter only on All Playlists tab; clear it when leaving
+  dom.playlistFilterWrap.classList.toggle('hidden', tab !== 'all');
+  if (tab !== 'all') dom.playlistFilter.value = '';
+  if (tab === 'my')       loadMyPlaylists(false);
+  else if (tab === 'all') loadAllPlaylists(false);
+  else                    loadOfficialPlaylists(false);
 }
 
 async function updatePlaylistInfo() {
@@ -272,12 +302,15 @@ dom.btnCardsPlus.addEventListener('click', () => {
 });
 dom.playlistSelect.addEventListener('change', () => { updatePlaylistInfo(); checkSetupReady(); });
 dom.btnRefresh.addEventListener('click', () => {
-  if (activePlaylistTab === 'my') loadMyPlaylists(true);
+  if (activePlaylistTab === 'my')  loadMyPlaylists(true);
+  else if (activePlaylistTab === 'all') loadAllPlaylists(true);
   else loadOfficialPlaylists(true);
 });
 dom.tabMy.addEventListener('click',       () => switchPlaylistTab('my'));
+dom.tabAll.addEventListener('click',      () => switchPlaylistTab('all'));
 dom.tabOfficial.addEventListener('click', () => switchPlaylistTab('official'));
 dom.btnStartGame.addEventListener('click', startGame);
+dom.playlistFilter.addEventListener('input', applyAllPlaylistsFilter);
 
 // ─── Auth panel (localhost only) ──────────────────────────────────────────────
 
@@ -382,8 +415,9 @@ function renderProfileButton() {
 
   // OAuth retry on setup page retries the active playlist tab
   setOAuthRetryAction(() => {
-    if (activePlaylistTab === 'my') loadMyPlaylists(true);
-    else loadOfficialPlaylists(true);
+    if (activePlaylistTab === 'my')       loadMyPlaylists(true);
+    else if (activePlaylistTab === 'all') loadAllPlaylists(true);
+    else                                  loadOfficialPlaylists(true);
   });
 })();
 

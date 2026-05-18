@@ -40,8 +40,12 @@
       <section class="setup-section">
         <h2>Playlist</h2>
         <div class="playlist-tabs">
-          <button class="playlist-tab active" id="tab-my">My Playlists</button>
+          <button class="playlist-tab active" id="tab-my">My Hitster Playlists</button>
+          <button class="playlist-tab" id="tab-all">All Playlists</button>
           <button class="playlist-tab" id="tab-official">Official Hitster</button>
+        </div>
+        <div id="playlist-filter-wrap" class="playlist-filter-wrap hidden">
+          <input id="playlist-filter" class="playlist-filter" type="text" placeholder="Filter by name…" autocomplete="off" spellcheck="false">
         </div>
         <div class="playlist-row">
           <select id="playlist-select">

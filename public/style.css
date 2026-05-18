@@ -572,6 +572,26 @@ button { cursor: pointer; font-family: inherit; border: none; outline: none; }
   color: var(--white);
 }
 
+.playlist-filter-wrap {
+  margin-top: 8px;
+}
+.playlist-filter {
+  width: 100%;
+  padding: 8px 12px;
+  font-size: 0.9rem;
+  font-family: inherit;
+  border: 1px solid var(--grey-200);
+  border-radius: var(--radius-sm, 8px);
+  background: var(--white);
+  color: var(--grey-900);
+  box-sizing: border-box;
+}
+.playlist-filter:focus {
+  outline: none;
+  border-color: var(--green);
+  box-shadow: 0 0 0 3px rgba(0,114,114,0.12);
+}
+
 /* Toggle switch */
 .toggle-row {
   display: flex;

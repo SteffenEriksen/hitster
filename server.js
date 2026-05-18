@@ -413,6 +413,25 @@ app.get('/api/playlists', async (req, res) => {
   }
 });
 
+// All playlists for the logged-in user (no name filter)
+app.get('/api/all-playlists', async (req, res) => {
+  try {
+    const all = [];
+    let url = '/me/playlists?limit=50&offset=0';
+    while (url) {
+      const data = await spotifyGet(url);
+      for (const pl of (data.items || [])) {
+        if (pl) all.push({ id: pl.id, name: pl.name, trackCount: pl.tracks?.total || 0, imageUrl: pl.images?.[0]?.url || '' });
+      }
+      url = data.next || null;
+    }
+    res.json(all);
+  } catch (e) {
+    console.error('/api/all-playlists error:', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // Search Spotify for official Hitster playlists, filtered to Nordic/UK/US region
 app.get('/api/official-playlists', async (req, res) => {
   try {
