@@ -166,7 +166,8 @@ async function spotifySeek(position_ms = 0) { await api.seek(position_ms); }
 // ─── Year localStorage cache ──────────────────────────────────────────────────
 
 const YEAR_KEY      = 'hitster_year_';
-const YEAR_OK_KEY   = 'hitster_year_ok_';  // '1' = MB confirmed, '0' = fell back to album year
+const YEAR_OK_KEY   = 'hitster_year_ok_';    // '1' = MB confirmed, '0' = fell back to album year
+const YEAR_USER_KEY = 'hitster_year_user_';  // '1' = player explicitly confirmed/corrected
 
 function getYearCache(id) {
   const v = localStorage.getItem(YEAR_KEY + id);
@@ -183,6 +184,15 @@ function isYearConfirmed(id) {
 
 function setYearConfirmed(id, confirmed) {
   try { localStorage.setItem(YEAR_OK_KEY + id, confirmed ? '1' : '0'); } catch (_) {}
+}
+
+/** Mark this year as player-confirmed (correction or "Looks right"). */
+function setYearUserConfirmed(id) {
+  try { localStorage.setItem(YEAR_USER_KEY + id, '1'); } catch (_) {}
+}
+
+function isYearUserConfirmed(id) {
+  return localStorage.getItem(YEAR_USER_KEY + id) === '1';
 }
 
 /** Apply any cached years from localStorage to an array of tracks (mutates). */
@@ -203,7 +213,12 @@ async function resolveCardYearMb(card) {
   const cached = getYearCache(card.id);
   if (cached !== null) {
     card.year = cached;
-    card.yearUncertain = !isYearConfirmed(card.id);
+    // For title-suspect tracks only trust explicit player confirmation, not MB.
+    // This ensures a wrong MB result (e.g. 2008 for a 1983 re-recording) that was
+    // cached before this fix doesn't slip through indefinitely.
+    card.yearUncertain = card.titleSuspect
+      ? !isYearUserConfirmed(card.id)
+      : !isYearConfirmed(card.id);
     return cached;
   }
 
@@ -212,6 +227,16 @@ async function resolveCardYearMb(card) {
     setYearCache(card.id, card.year);
     setYearConfirmed(card.id, !card.suspect);
     card.yearUncertain = !!card.suspect;
+    return card.year;
+  }
+
+  if (card.titleSuspect) {
+    // Re-recorded / remix / live — the ISRC belongs to the variant, so MB would
+    // return the variant's year (e.g. 2008 for a 1983 re-recording), not the
+    // original. Skip MB entirely and flag as uncertain so players can correct it.
+    setYearCache(card.id, card.year);
+    setYearConfirmed(card.id, false);
+    card.yearUncertain = true;
     return card.year;
   }
 

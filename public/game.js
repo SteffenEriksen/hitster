@@ -580,6 +580,7 @@ function applyYearCorrection(newYear) {
   card.yearUncertain = false;
   setYearCache(card.id, newYear);
   setYearConfirmed(card.id, true);
+  setYearUserConfirmed(card.id);
 
   // Remove card from team timeline if it was already placed (correct first result)
   const team = currentTeam();
@@ -831,6 +832,7 @@ dom.btnYearDismiss.addEventListener('click', () => {
   const card = state.currentCard;
   if (card) {
     setYearConfirmed(card.id, true);
+    setYearUserConfirmed(card.id);
     card.yearUncertain = false;
     dom.revealYear.textContent = String(card.year);
     dom.revealYear.title       = '';

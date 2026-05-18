@@ -264,6 +264,16 @@ function cleanTitle(name) {
     .trim();
 }
 
+// Catches title-level variants in BOTH parenthesised form — (Re-Recorded) —
+// and dash-separated form — "- Re-Recorded", "- Remastered 2011", etc.
+// These tracks have their own ISRC that belongs to the variant, so MusicBrainz
+// would return the variant's year rather than the original release year.
+const TITLE_VARIANT_RE = /[\(\[].*(?:remaster|re.?record|re.?release|re.?issue|remix|version|edit|live|radio|acoustic|mono|stereo|anniversary|demo|extended|original mix)[^\)\]]*[\)\]]|\s+-\s+(?:remaster|re.?record|re.?release|re.?issue|remix|live|radio|acoustic|mono|stereo|anniversary|demo|extended)/i;
+
+function isTitleSuspect(name) {
+  return TITLE_VARIANT_RE.test(name);
+}
+
 // ─── MusicBrainz helper ───────────────────────────────────────────────────────
 
 const mbYearCache = {};  // isrc → year (in-memory per server session)
@@ -299,18 +309,20 @@ function mbRequest(url) {
 // ─── Track formatter ──────────────────────────────────────────────────────────
 
 function formatTrack(t) {
-  const albumYear = parseInt((t.album?.release_date || '').split('-')[0]) || null;
-  const suspect   = isAlbumSuspect(t.album) || cleanTitle(t.name) !== t.name;
+  const albumYear    = parseInt((t.album?.release_date || '').split('-')[0]) || null;
+  const titleSuspect = isTitleSuspect(t.name);
+  const suspect      = isAlbumSuspect(t.album) || titleSuspect;
   return {
-    id:       t.id,
-    title:    t.name,
-    artist:   t.artists.map((a) => a.name).join(', '),
-    year:     albumYear,   // raw album year; overridden in-game by MusicBrainz lookup
-    suspect,              // true = album date is probably not the original release year
-    isrc:     t.external_ids?.isrc || null,
-    uri:      t.uri,
-    albumArt: t.album?.images?.[0]?.url || '',
-    duration: t.duration_ms || 0,
+    id:           t.id,
+    title:        t.name,
+    artist:       t.artists.map((a) => a.name).join(', '),
+    year:         albumYear,
+    suspect,
+    titleSuspect, // true = title is a variant (re-recorded, remix, live…) — MB year unreliable
+    isrc:         t.external_ids?.isrc || null,
+    uri:          t.uri,
+    albumArt:     t.album?.images?.[0]?.url || '',
+    duration:     t.duration_ms || 0,
   };
 }
 
