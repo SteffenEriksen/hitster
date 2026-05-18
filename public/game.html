@@ -95,6 +95,15 @@
           </div>
         </div>
       </div>
+      <!-- Year correction (shown when yearUncertain after reveal) -->
+      <div id="year-edit-section" class="year-edit-section hidden">
+        <span class="year-edit-label">⚠ Year may be approximate — correct if needed:</span>
+        <div class="year-edit-row">
+          <input id="year-edit-input" class="year-edit-input" type="number" min="1900" max="2030" step="1">
+          <button id="btn-year-confirm" class="btn-primary btn-sm">✓ Update</button>
+          <button id="btn-year-dismiss" class="btn-ghost btn-sm">Looks right</button>
+        </div>
+      </div>
     </div>
 
     <!-- Decade reveal -->

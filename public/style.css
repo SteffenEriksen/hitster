@@ -1263,6 +1263,37 @@ button { cursor: pointer; font-family: inherit; border: none; outline: none; }
   flex-wrap: wrap;
 }
 
+/* ─── Year correction section ─────────────────────────────────────────────── */
+.year-edit-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0 2px;
+}
+.year-edit-label {
+  font-size: 0.8rem;
+  color: var(--grey-500, #6b7280);
+  text-align: center;
+}
+.year-edit-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.year-edit-input {
+  width: 76px;
+  padding: 6px 10px;
+  font-size: 0.9rem;
+  font-family: inherit;
+  border: 1px solid var(--grey-300, #d1d5db);
+  border-radius: var(--radius-sm, 8px);
+  text-align: center;
+  background: #fff;
+  color: var(--grey-900, #111827);
+}
+.year-edit-input:focus { outline: none; border-color: var(--primary, #007272); }
+
 /* ─── Overturn section ───────────────────────────────────────────────────── */
 .overturn-section {
   display: flex;

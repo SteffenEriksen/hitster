@@ -83,6 +83,11 @@ const dom = {
   btnStartTurn: $('btn-start-turn'),
   btnConfirm:   $('btn-confirm'),
   btnNextTeam:  $('btn-next-team'),
+  // Year correction
+  yearEditSection: $('year-edit-section'),
+  yearEditInput:   $('year-edit-input'),
+  btnYearConfirm:  $('btn-year-confirm'),
+  btnYearDismiss:  $('btn-year-dismiss'),
 };
 
 // ─── Game state ───────────────────────────────────────────────────────────────
@@ -329,6 +334,7 @@ function enterPreTurn() {
   dom.hardChallenge.classList.add('hidden');
   dom.overturnSection.classList.add('hidden');
   dom.overturnConfirm.classList.add('hidden');
+  dom.yearEditSection.classList.add('hidden');
   hidePlaybackError();
   dom.suddenDeathOverlay.classList.add('hidden');
 
@@ -531,6 +537,12 @@ function finishPlacement(correct, slot, fromHardMode = false) {
   renderCurrentTeamBar();
   renderOtherTeams();
 
+  // If year is uncertain let players correct it before moving on
+  if (card.yearUncertain) {
+    dom.yearEditInput.value = card.year;
+    dom.yearEditSection.classList.remove('hidden');
+  }
+
   if (correct && outcomeAlreadyDetermined()) {
     state._skipToWin = true;
     dom.btnNextTeam.textContent = '🏆 See Results!';
@@ -556,6 +568,62 @@ function overturnPlacement() {
   renderTimeline(false);
   renderCurrentTeamBar();
   renderOtherTeams();
+}
+
+function applyYearCorrection(newYear) {
+  const card = state.currentCard;
+  const slot = state.selectedSlot;
+  if (!card || slot === null) return;
+
+  // Persist the corrected year
+  card.year          = newYear;
+  card.yearUncertain = false;
+  setYearCache(card.id, newYear);
+  setYearConfirmed(card.id, true);
+
+  // Remove card from team timeline if it was already placed (correct first result)
+  const team = currentTeam();
+  const existingIdx = team.cards.indexOf(card);
+  if (existingIdx !== -1) team.cards.splice(existingIdx, 1);
+
+  // Re-evaluate placement with the corrected year
+  const cards   = team.cards;
+  const leftOk  = slot === 0 || cards[slot - 1]?.year <= newYear;
+  const rightOk = slot >= cards.length || cards[slot]?.year >= newYear;
+  const correct = leftOk && rightOk;
+
+  if (correct) {
+    team.cards.splice(slot, 0, card);
+    dom.resultBanner.className = 'result-banner correct';
+    dom.resultText.textContent = '✓ Correct! Card added to timeline.';
+    dom.cardRevealed.classList.remove('wrong');
+    dom.overturnSection.classList.add('hidden');
+    state.pendingOverturnSlot = null;
+  } else {
+    dom.resultBanner.className = 'result-banner wrong';
+    dom.resultText.textContent = '✗ Wrong! Card discarded.';
+    dom.cardRevealed.classList.add('wrong');
+  }
+
+  dom.revealYear.textContent = String(newYear);
+  dom.revealYear.title       = '';
+  dom.yearEditSection.classList.add('hidden');
+
+  renderTimeline(false);
+  renderCurrentTeamBar();
+  renderOtherTeams();
+
+  // Re-check whether the outcome is now determined
+  if (correct && outcomeAlreadyDetermined()) {
+    state._skipToWin = true;
+    dom.btnNextTeam.textContent = '🏆 See Results!';
+    setTimeout(() => {
+      if (state._skipToWin && state.phase === 'revealed') nextTeam();
+    }, 3000);
+  } else {
+    state._skipToWin = false;
+    dom.btnNextTeam.textContent = 'Next Team →';
+  }
 }
 
 function nextTeam() {
@@ -749,6 +817,26 @@ dom.btnOverturnNo.addEventListener('click', () => {
   dom.btnOverturn.classList.remove('hidden');
 });
 dom.btnOverturnYes.addEventListener('click', overturnPlacement);
+
+// Year correction
+dom.btnYearConfirm.addEventListener('click', () => {
+  const newYear = parseInt(dom.yearEditInput.value, 10);
+  if (!newYear || newYear < 1900 || newYear > 2030) return;
+  applyYearCorrection(newYear);
+});
+dom.yearEditInput.addEventListener('keydown', e => {
+  if (e.key === 'Enter') dom.btnYearConfirm.click();
+});
+dom.btnYearDismiss.addEventListener('click', () => {
+  const card = state.currentCard;
+  if (card) {
+    setYearConfirmed(card.id, true);
+    card.yearUncertain = false;
+    dom.revealYear.textContent = String(card.year);
+    dom.revealYear.title       = '';
+  }
+  dom.yearEditSection.classList.add('hidden');
+});
 
 dom.btnSdFight.addEventListener('click', () => {
   dom.suddenDeathOverlay.classList.add('hidden');
