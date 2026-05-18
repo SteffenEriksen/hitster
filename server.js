@@ -502,12 +502,31 @@ app.get('/api/resolve-year-mb', async (req, res) => {
   }
 });
 
-// Play a track URI on active device
+// Play a track URI on active device.
+// If Spotify returns "no active device" (404), automatically find an available
+// device, transfer playback to it, and retry — so a briefly-idle Spotify client
+// doesn't surface an error to the players.
 app.post('/api/play', async (req, res) => {
   try {
     const { uri } = req.body;
     if (!uri) return res.status(400).json({ error: 'uri required' });
-    await spotifyPut('/me/player/play', { uris: [uri] });
+
+    try {
+      await spotifyPut('/me/player/play', { uris: [uri] });
+    } catch (e) {
+      if (!e.message.includes('404') && !/no active device/i.test(e.message)) throw e;
+
+      // Find any available device and wake it up
+      const data   = await spotifyGet('/me/player/devices');
+      const device = (data.devices || []).find(d => d.is_active) || (data.devices || [])[0];
+      if (!device) throw new Error('No Spotify devices available — open Spotify on a device and try again.');
+
+      console.log('/api/play: no active device, transferring to', device.name);
+      await spotifyPut('/me/player', { device_ids: [device.id], play: false });
+      await new Promise(r => setTimeout(r, 600));   // give Spotify a moment
+      await spotifyPut('/me/player/play', { uris: [uri] });
+    }
+
     res.json({ ok: true });
   } catch (e) {
     console.error('/api/play error:', e.message);
