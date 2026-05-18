@@ -89,6 +89,11 @@ const dom = {
   btnYearConfirm:  $('btn-year-confirm'),
   btnYearDismiss:  $('btn-year-dismiss'),
   btnEditYear:     $('btn-edit-year'),
+  // End game
+  btnEndGame:        $('btn-end-game'),
+  endGameConfirm:    $('end-game-confirm'),
+  btnEndGameYes:     $('btn-end-game-yes'),
+  btnEndGameNo:      $('btn-end-game-no'),
 };
 
 // ─── Game state ───────────────────────────────────────────────────────────────
@@ -770,6 +775,21 @@ function resetGame() {
   location.href = '/';
 }
 
+function endGame() {
+  dom.endGameConfirm.classList.add('hidden');
+  const maxCards     = Math.max(...state.teams.map(t => t.cards.length));
+  const winnerIndices = state.teams
+    .map((t, i) => ({ t, i }))
+    .filter(({ t }) => t.cards.length === maxCards)
+    .map(({ i }) => i);
+  sessionStorage.setItem('hitster_winner', JSON.stringify({
+    teams:        state.teams,
+    winnerIndices,
+    cardsToWin:   state.cardsToWin,
+  }));
+  location.href = 'winner.html';
+}
+
 // ─── Event listeners ──────────────────────────────────────────────────────────
 
 dom.btnStartTurn.addEventListener('click', beginTurn);
@@ -848,6 +868,15 @@ dom.btnYearDismiss.addEventListener('click', () => {
   }
   dom.yearEditSection.classList.add('hidden');
 });
+
+// End game
+dom.btnEndGame.addEventListener('click', () => {
+  dom.endGameConfirm.classList.toggle('hidden');
+});
+dom.btnEndGameNo.addEventListener('click', () => {
+  dom.endGameConfirm.classList.add('hidden');
+});
+dom.btnEndGameYes.addEventListener('click', endGame);
 
 dom.btnSdFight.addEventListener('click', () => {
   dom.suddenDeathOverlay.classList.add('hidden');
