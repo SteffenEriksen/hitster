@@ -25,7 +25,7 @@ let   infoFetchSeq    = 0;        // cancel stale fetches on fast playlist switc
 let   myPlaylistsCache      = null;
 let   allPlaylistsCache     = null;
 let   officialPlaylistsCache = null;
-let   activePlaylistTab     = 'my';   // 'my' | 'all' | 'official'
+let   activePlaylistTab     = 'my';   // 'my' | 'all' | 'search' | 'official'
 
 // ─── DOM refs (setup screen) ──────────────────────────────────────────────────
 
@@ -40,9 +40,13 @@ const dom = {
   btnRefresh:     $('btn-refresh-playlists'),
   tabMy:          $('tab-my'),
   tabAll:         $('tab-all'),
+  tabSearch:      $('tab-search'),
   tabOfficial:    $('tab-official'),
-  playlistFilterWrap: $('playlist-filter-wrap'),
-  playlistFilter:     $('playlist-filter'),
+  playlistFilterWrap:  $('playlist-filter-wrap'),
+  playlistFilter:      $('playlist-filter'),
+  playlistSearchWrap:  $('playlist-search-wrap'),
+  playlistSearchInput: $('playlist-search-input'),
+  btnPlaylistSearch:   $('btn-playlist-search'),
   playlistInfo:   $('playlist-info'),
   btnStartGame:   $('btn-start-game'),
   setupError:     $('setup-error'),
@@ -120,16 +124,42 @@ function applyAllPlaylistsFilter() {
   setSelectOptions(filtered, false);
 }
 
+let _searchDebounce = null;
+
+async function loadSearchPlaylists(q) {
+  q = (q || '').trim();
+  if (!q) {
+    dom.playlistSelect.innerHTML = '<option value="">Type to search Spotify playlists…</option>';
+    dom.playlistInfo.textContent = '';
+    dom.btnStartGame.disabled = true;
+    return;
+  }
+  dom.playlistSelect.innerHTML = '<option value="">Searching…</option>';
+  dom.btnStartGame.disabled = true;
+  dom.setupError.textContent = '';
+  try {
+    const playlists = await api.get('/api/search-playlists?q=' + encodeURIComponent(q));
+    setSelectOptions(playlists, true);
+  } catch (e) {
+    dom.playlistSelect.innerHTML = '<option value="">Search failed</option>';
+    dom.setupError.textContent = e.message;
+  }
+}
+
 function switchPlaylistTab(tab) {
   activePlaylistTab = tab;
   dom.tabMy.classList.toggle('active', tab === 'my');
   dom.tabAll.classList.toggle('active', tab === 'all');
+  dom.tabSearch.classList.toggle('active', tab === 'search');
   dom.tabOfficial.classList.toggle('active', tab === 'official');
-  // Show filter only on All Playlists tab; clear it when leaving
+  // Show/hide contextual inputs
   dom.playlistFilterWrap.classList.toggle('hidden', tab !== 'all');
-  if (tab !== 'all') dom.playlistFilter.value = '';
+  dom.playlistSearchWrap.classList.toggle('hidden', tab !== 'search');
+  if (tab !== 'all')    dom.playlistFilter.value = '';
+  if (tab !== 'search') dom.playlistSearchInput.value = '';
   if (tab === 'my')       loadMyPlaylists(false);
   else if (tab === 'all') loadAllPlaylists(false);
+  else if (tab === 'search') loadSearchPlaylists('');
   else                    loadOfficialPlaylists(false);
 }
 
@@ -302,15 +332,29 @@ dom.btnCardsPlus.addEventListener('click', () => {
 });
 dom.playlistSelect.addEventListener('change', () => { updatePlaylistInfo(); checkSetupReady(); });
 dom.btnRefresh.addEventListener('click', () => {
-  if (activePlaylistTab === 'my')  loadMyPlaylists(true);
+  if (activePlaylistTab === 'my')       loadMyPlaylists(true);
   else if (activePlaylistTab === 'all') loadAllPlaylists(true);
+  else if (activePlaylistTab === 'search') loadSearchPlaylists(dom.playlistSearchInput.value);
   else loadOfficialPlaylists(true);
 });
 dom.tabMy.addEventListener('click',       () => switchPlaylistTab('my'));
 dom.tabAll.addEventListener('click',      () => switchPlaylistTab('all'));
+dom.tabSearch.addEventListener('click',   () => switchPlaylistTab('search'));
 dom.tabOfficial.addEventListener('click', () => switchPlaylistTab('official'));
 dom.btnStartGame.addEventListener('click', startGame);
 dom.playlistFilter.addEventListener('input', applyAllPlaylistsFilter);
+
+// Search tab — debounced on input, immediate on Enter or button click
+dom.playlistSearchInput.addEventListener('input', () => {
+  clearTimeout(_searchDebounce);
+  _searchDebounce = setTimeout(() => loadSearchPlaylists(dom.playlistSearchInput.value), 500);
+});
+dom.playlistSearchInput.addEventListener('keydown', e => {
+  if (e.key === 'Enter') { clearTimeout(_searchDebounce); loadSearchPlaylists(dom.playlistSearchInput.value); }
+});
+dom.btnPlaylistSearch.addEventListener('click', () => {
+  clearTimeout(_searchDebounce); loadSearchPlaylists(dom.playlistSearchInput.value);
+});
 
 // ─── Auth panel (localhost only) ──────────────────────────────────────────────
 
@@ -415,9 +459,10 @@ function renderProfileButton() {
 
   // OAuth retry on setup page retries the active playlist tab
   setOAuthRetryAction(() => {
-    if (activePlaylistTab === 'my')       loadMyPlaylists(true);
-    else if (activePlaylistTab === 'all') loadAllPlaylists(true);
-    else                                  loadOfficialPlaylists(true);
+    if (activePlaylistTab === 'my')          loadMyPlaylists(true);
+    else if (activePlaylistTab === 'all')    loadAllPlaylists(true);
+    else if (activePlaylistTab === 'search') loadSearchPlaylists(dom.playlistSearchInput.value);
+    else                                     loadOfficialPlaylists(true);
   });
 })();
 

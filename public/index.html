@@ -40,12 +40,29 @@
       <section class="setup-section">
         <h2>Playlist</h2>
         <div class="playlist-tabs">
-          <button class="playlist-tab active" id="tab-my">My Hitster Playlists</button>
-          <button class="playlist-tab" id="tab-all">All Playlists</button>
-          <button class="playlist-tab" id="tab-official">Official Hitster</button>
+          <div class="tab-group">
+            <span class="tab-group-label">Your library</span>
+            <div class="tab-group-btns">
+              <button class="playlist-tab active" id="tab-my">My Hitster Playlists</button>
+              <button class="playlist-tab" id="tab-all">All Playlists</button>
+            </div>
+          </div>
+          <div class="tab-group">
+            <span class="tab-group-label">Spotify</span>
+            <div class="tab-group-btns">
+              <button class="playlist-tab" id="tab-search">Search</button>
+              <button class="playlist-tab" id="tab-official">Official Hitster</button>
+            </div>
+          </div>
         </div>
         <div id="playlist-filter-wrap" class="playlist-filter-wrap hidden">
-          <input id="playlist-filter" class="playlist-filter" type="text" placeholder="Filter by name…" autocomplete="off" spellcheck="false">
+          <input id="playlist-filter" class="playlist-filter-input" type="text" placeholder="Filter by name…" autocomplete="off" spellcheck="false">
+        </div>
+        <div id="playlist-search-wrap" class="playlist-search-wrap hidden">
+          <div class="playlist-search-row">
+            <input id="playlist-search-input" class="playlist-filter-input" type="search" placeholder="Search Spotify playlists…" autocomplete="off" spellcheck="false">
+            <button id="btn-playlist-search" class="btn-ghost btn-icon" title="Search">🔍</button>
+          </div>
         </div>
         <div class="playlist-row">
           <select id="playlist-select">

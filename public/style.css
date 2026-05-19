@@ -546,8 +546,31 @@ button { cursor: pointer; font-family: inherit; border: none; outline: none; }
 /* Playlist tabs */
 .playlist-tabs {
   display: flex;
-  gap: 6px;
+  gap: 12px;
   margin-bottom: 10px;
+  align-items: flex-end;
+}
+.tab-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+}
+.tab-group-label {
+  font-size: 0.62rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--grey-400, #9ca3af);
+  padding-left: 2px;
+}
+.tab-group + .tab-group {
+  padding-left: 12px;
+  border-left: 1px solid var(--grey-100, #f3f4f6);
+}
+.tab-group-btns {
+  display: flex;
+  gap: 6px;
 }
 .playlist-tab {
   flex: 1;
@@ -572,10 +595,10 @@ button { cursor: pointer; font-family: inherit; border: none; outline: none; }
   color: var(--white);
 }
 
-.playlist-filter-wrap {
-  margin-top: 8px;
-}
-.playlist-filter {
+.playlist-filter-wrap { margin-top: 8px; }
+.playlist-search-wrap { margin-top: 8px; }
+.playlist-search-row  { display: flex; gap: 6px; align-items: center; }
+.playlist-filter-input {
   width: 100%;
   padding: 8px 12px;
   font-size: 0.9rem;
@@ -586,7 +609,7 @@ button { cursor: pointer; font-family: inherit; border: none; outline: none; }
   color: var(--grey-900);
   box-sizing: border-box;
 }
-.playlist-filter:focus {
+.playlist-filter-input:focus {
   outline: none;
   border-color: var(--green);
   box-shadow: 0 0 0 3px rgba(0,114,114,0.12);
