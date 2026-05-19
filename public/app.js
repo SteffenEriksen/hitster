@@ -26,6 +26,8 @@ let   myPlaylistsCache      = null;
 let   allPlaylistsCache     = null;
 let   officialPlaylistsCache = null;
 let   activePlaylistTab     = 'my';   // 'my' | 'all' | 'search' | 'official'
+let   minTracksFilter       = 50;     // null = no filter
+let   lastSearchResults     = null;   // cached raw search results for re-filtering
 
 // ─── DOM refs (setup screen) ──────────────────────────────────────────────────
 
@@ -47,8 +49,7 @@ const dom = {
   playlistSearchWrap:  $('playlist-search-wrap'),
   playlistSearchInput: $('playlist-search-input'),
   btnPlaylistSearch:   $('btn-playlist-search'),
-  playlistMinTracksWrap: $('playlist-min-tracks-wrap'),
-  toggleMinTracks:       $('toggle-min-tracks'),
+  playlistSizeFilter:  $('playlist-size-filter'),
   playlistInfo:   $('playlist-info'),
   btnStartGame:   $('btn-start-game'),
   setupError:     $('setup-error'),
@@ -57,17 +58,27 @@ const dom = {
 // ─── Setup screen ─────────────────────────────────────────────────────────────
 
 function setSelectOptions(playlists, showOwner) {
-  if (playlists.length === 0) {
-    const msg = showOwner
-      ? 'No Official Hitster playlists found'
-      : 'No "Hitster" playlists found';
+  const filtered = minTracksFilter
+    ? playlists.filter(pl => pl.trackCount >= minTracksFilter)
+    : playlists;
+
+  if (filtered.length === 0) {
+    let msg, info;
+    if (minTracksFilter && playlists.length > 0) {
+      msg  = 'No playlists with ' + minTracksFilter + '+ tracks';
+      info = 'Try a lower minimum, or click the selected number to clear the filter.';
+    } else if (showOwner) {
+      msg  = 'No Official Hitster playlists found';
+      info = 'Try again later — Spotify search may be slow.';
+    } else {
+      msg  = 'No playlists found';
+      info = '';
+    }
     dom.playlistSelect.innerHTML = '<option value="">' + msg + '</option>';
-    dom.playlistInfo.textContent = showOwner
-      ? 'Try again later — Spotify search may be slow.'
-      : 'Create a Spotify playlist with "Hitster" in the name.';
+    dom.playlistInfo.textContent = info;
     return;
   }
-  dom.playlistSelect.innerHTML = playlists.map(pl => {
+  dom.playlistSelect.innerHTML = filtered.map(pl => {
     const label = showOwner
       ? pl.name + ' (' + pl.trackCount + ' tracks) — ' + pl.owner
       : pl.name + ' (' + pl.trackCount + ' tracks)';
@@ -122,10 +133,7 @@ async function loadAllPlaylists(forceReload) {
 function applyAllPlaylistsFilter() {
   if (!allPlaylistsCache) return;
   const q      = dom.playlistFilter.value.toLowerCase().trim();
-  const minFifty = dom.toggleMinTracks.checked;
-  let filtered = allPlaylistsCache;
-  if (q)        filtered = filtered.filter(pl => pl.name.toLowerCase().includes(q));
-  if (minFifty) filtered = filtered.filter(pl => pl.trackCount >= 50);
+  const filtered = q ? allPlaylistsCache.filter(pl => pl.name.toLowerCase().includes(q)) : allPlaylistsCache;
   setSelectOptions(filtered, false);
 }
 
@@ -143,8 +151,8 @@ async function loadSearchPlaylists(q) {
   dom.btnStartGame.disabled = true;
   dom.setupError.textContent = '';
   try {
-    let playlists = await api.get('/api/search-playlists?q=' + encodeURIComponent(q));
-    if (dom.toggleMinTracks.checked) playlists = playlists.filter(pl => pl.trackCount >= 50);
+    const playlists = await api.get('/api/search-playlists?q=' + encodeURIComponent(q));
+    lastSearchResults = playlists;
     setSelectOptions(playlists, true);
   } catch (e) {
     dom.playlistSelect.innerHTML = '<option value="">Search failed</option>';
@@ -161,7 +169,6 @@ function switchPlaylistTab(tab) {
   // Show/hide contextual inputs
   dom.playlistFilterWrap.classList.toggle('hidden', tab !== 'all');
   dom.playlistSearchWrap.classList.toggle('hidden', tab !== 'search');
-  dom.playlistMinTracksWrap.classList.toggle('hidden', tab !== 'all' && tab !== 'search');
   if (tab !== 'all')    dom.playlistFilter.value = '';
   if (tab !== 'search') dom.playlistSearchInput.value = '';
   if (tab === 'my')       loadMyPlaylists(false);
@@ -362,11 +369,25 @@ dom.playlistSearchInput.addEventListener('keydown', e => {
 dom.btnPlaylistSearch.addEventListener('click', () => {
   clearTimeout(_searchDebounce); loadSearchPlaylists(dom.playlistSearchInput.value);
 });
-dom.toggleMinTracks.addEventListener('change', () => {
-  if (activePlaylistTab === 'all')    applyAllPlaylistsFilter();
-  if (activePlaylistTab === 'search') loadSearchPlaylists(dom.playlistSearchInput.value);
-});
+function reapplyCurrentTabFilter() {
+  if      (activePlaylistTab === 'my'       && myPlaylistsCache)       setSelectOptions(myPlaylistsCache, false);
+  else if (activePlaylistTab === 'all')                                 applyAllPlaylistsFilter();
+  else if (activePlaylistTab === 'search'   && lastSearchResults)      setSelectOptions(lastSearchResults, true);
+  else if (activePlaylistTab === 'official' && officialPlaylistsCache) setSelectOptions(officialPlaylistsCache, true);
+}
 
+// Min-tracks pill selector
+dom.playlistSizeFilter.addEventListener('click', e => {
+  const btn = e.target.closest('.psf-btn');
+  if (!btn) return;
+  const val = parseInt(btn.dataset.min, 10);
+  // Click active button → deselect (no filter); click other → select it
+  minTracksFilter = (minTracksFilter === val) ? null : val;
+  dom.playlistSizeFilter.querySelectorAll('.psf-btn').forEach(b => {
+    b.classList.toggle('active', parseInt(b.dataset.min, 10) === minTracksFilter);
+  });
+  reapplyCurrentTabFilter();
+});
 // ─── Auth panel (localhost only) ──────────────────────────────────────────────
 
 const authPanel = {

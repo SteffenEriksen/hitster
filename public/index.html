@@ -64,14 +64,12 @@
             <button id="btn-playlist-search" class="btn-ghost btn-icon" title="Search">🔍</button>
           </div>
         </div>
-        <div id="playlist-min-tracks-wrap" class="playlist-min-tracks-wrap hidden">
-          <label class="playlist-toggle-row">
-            <span class="toggle-switch-wrap">
-              <input type="checkbox" id="toggle-min-tracks" class="toggle-check" checked>
-              <span class="toggle-track"><span class="toggle-thumb"></span></span>
-            </span>
-            <span class="playlist-toggle-label">At least 50 songs</span>
-          </label>
+        <div id="playlist-size-filter" class="playlist-size-filter">
+          <span class="psf-label">Min. songs:</span>
+          <button class="psf-btn active" data-min="50">50</button>
+          <button class="psf-btn" data-min="100">100</button>
+          <button class="psf-btn" data-min="200">200</button>
+          <button class="psf-btn" data-min="400">400</button>
         </div>
         <div class="playlist-row">
           <select id="playlist-select">
