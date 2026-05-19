@@ -598,6 +598,19 @@ button { cursor: pointer; font-family: inherit; border: none; outline: none; }
 .playlist-filter-wrap { margin-top: 8px; }
 .playlist-search-wrap { margin-top: 8px; }
 .playlist-search-row  { display: flex; gap: 6px; align-items: center; }
+.playlist-min-tracks-wrap { margin-top: 8px; }
+.playlist-toggle-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  user-select: none;
+}
+.playlist-toggle-label {
+  font-size: 0.82rem;
+  color: var(--grey-600);
+  font-weight: 500;
+}
 .playlist-filter-input {
   width: 100%;
   padding: 8px 12px;

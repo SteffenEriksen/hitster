@@ -47,6 +47,8 @@ const dom = {
   playlistSearchWrap:  $('playlist-search-wrap'),
   playlistSearchInput: $('playlist-search-input'),
   btnPlaylistSearch:   $('btn-playlist-search'),
+  playlistMinTracksWrap: $('playlist-min-tracks-wrap'),
+  toggleMinTracks:       $('toggle-min-tracks'),
   playlistInfo:   $('playlist-info'),
   btnStartGame:   $('btn-start-game'),
   setupError:     $('setup-error'),
@@ -119,8 +121,11 @@ async function loadAllPlaylists(forceReload) {
 
 function applyAllPlaylistsFilter() {
   if (!allPlaylistsCache) return;
-  const q        = dom.playlistFilter.value.toLowerCase().trim();
-  const filtered = q ? allPlaylistsCache.filter(pl => pl.name.toLowerCase().includes(q)) : allPlaylistsCache;
+  const q      = dom.playlistFilter.value.toLowerCase().trim();
+  const minFifty = dom.toggleMinTracks.checked;
+  let filtered = allPlaylistsCache;
+  if (q)        filtered = filtered.filter(pl => pl.name.toLowerCase().includes(q));
+  if (minFifty) filtered = filtered.filter(pl => pl.trackCount >= 50);
   setSelectOptions(filtered, false);
 }
 
@@ -138,7 +143,8 @@ async function loadSearchPlaylists(q) {
   dom.btnStartGame.disabled = true;
   dom.setupError.textContent = '';
   try {
-    const playlists = await api.get('/api/search-playlists?q=' + encodeURIComponent(q));
+    let playlists = await api.get('/api/search-playlists?q=' + encodeURIComponent(q));
+    if (dom.toggleMinTracks.checked) playlists = playlists.filter(pl => pl.trackCount >= 50);
     setSelectOptions(playlists, true);
   } catch (e) {
     dom.playlistSelect.innerHTML = '<option value="">Search failed</option>';
@@ -155,6 +161,7 @@ function switchPlaylistTab(tab) {
   // Show/hide contextual inputs
   dom.playlistFilterWrap.classList.toggle('hidden', tab !== 'all');
   dom.playlistSearchWrap.classList.toggle('hidden', tab !== 'search');
+  dom.playlistMinTracksWrap.classList.toggle('hidden', tab !== 'all' && tab !== 'search');
   if (tab !== 'all')    dom.playlistFilter.value = '';
   if (tab !== 'search') dom.playlistSearchInput.value = '';
   if (tab === 'my')       loadMyPlaylists(false);
@@ -354,6 +361,10 @@ dom.playlistSearchInput.addEventListener('keydown', e => {
 });
 dom.btnPlaylistSearch.addEventListener('click', () => {
   clearTimeout(_searchDebounce); loadSearchPlaylists(dom.playlistSearchInput.value);
+});
+dom.toggleMinTracks.addEventListener('change', () => {
+  if (activePlaylistTab === 'all')    applyAllPlaylistsFilter();
+  if (activePlaylistTab === 'search') loadSearchPlaylists(dom.playlistSearchInput.value);
 });
 
 // ─── Auth panel (localhost only) ──────────────────────────────────────────────
