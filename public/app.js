@@ -488,6 +488,25 @@ function showConnectModal(errorMsg) {
   modal.classList.remove('hidden');
 }
 
+function renderInfoPanel(authStatus) {
+  const el = document.getElementById('info-account');
+  if (!el) return;
+  if (authStatus && (authStatus.oauthLinked || authStatus.envAuth)) {
+    const name = authStatus.displayName || 'Spotify account';
+    el.innerHTML =
+      '<div class="info-card-icon">✓</div>' +
+      '<h3 class="info-card-title info-card-title--green">Connected</h3>' +
+      '<p class="info-card-body"><strong>' + esc(name) + '</strong> is linked and ready to use.</p>';
+    el.classList.add('info-card--connected');
+  } else {
+    el.innerHTML =
+      '<div class="info-card-icon">🔗</div>' +
+      '<h3 class="info-card-title">Not connected</h3>' +
+      '<p class="info-card-body">Link your Spotify account to load playlists and play music.</p>' +
+      '<a href="/auth/login" class="btn-spotify-connect btn-spotify-connect--sm">Connect with Spotify</a>';
+  }
+}
+
 (async () => {
   // Handle PKCE callback (Spotify redirects back to / with ?code=...&state=pkce_personal)
   const params = new URLSearchParams(location.search);
@@ -513,12 +532,14 @@ function showConnectModal(errorMsg) {
   try {
     const res = await fetch('/auth/status');
     const s   = await res.json();
+    renderInfoPanel(s);
     if (!s.oauthLinked && !s.envAuth) {
       const authError = params.get('auth_error');
       showConnectModal(authError ? 'Could not connect: ' + decodeURIComponent(authError) + '. Please try again.' : null);
       return;
     }
   } catch (_) {
+    renderInfoPanel(null);
     showConnectModal(null);
     return;
   }

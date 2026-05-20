@@ -431,13 +431,66 @@ button { cursor: pointer; font-family: inherit; border: none; outline: none; }
 .profile-dropdown-connect:hover { background: #f0faf3; }
 
 .setup-main {
-  max-width: 480px;
-  width: 100%;
-  margin: 0 auto;
-  padding: 32px 24px 48px;
   display: flex;
   flex-direction: column;
   gap: 32px;
+}
+
+/* Two-column layout: form + info panel */
+.setup-body {
+  display: grid;
+  grid-template-columns: minmax(0, 480px) 268px;
+  gap: 32px;
+  max-width: 830px;
+  margin: 0 auto;
+  padding: 32px 24px 48px;
+  align-items: start;
+}
+@media (max-width: 740px) {
+  .setup-body { grid-template-columns: 1fr; padding: 24px 16px 40px; }
+  .setup-info  { order: -1; }
+}
+
+/* Info panel */
+.setup-info {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  position: sticky;
+  top: 24px;
+}
+.info-card {
+  background: var(--grey-50, #f9fafb);
+  border: 1px solid var(--grey-100, #f3f4f6);
+  border-radius: var(--radius, 16px);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.info-card--connected {
+  background: #f0fdf4;
+  border-color: #bbf7d0;
+}
+.info-card-icon { font-size: 1.2rem; line-height: 1; }
+.info-card-title {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--grey-800, #1f2937);
+  margin: 0;
+}
+.info-card-title--green { color: #15803d; }
+.info-card-body {
+  font-size: 0.78rem;
+  color: var(--grey-600, #4b5563);
+  line-height: 1.5;
+  margin: 0;
+}
+.btn-spotify-connect--sm {
+  margin-top: 4px;
+  padding: 9px 16px;
+  font-size: 0.82rem;
+  align-self: flex-start;
 }
 
 .setup-section h2 {

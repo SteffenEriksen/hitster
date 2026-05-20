@@ -18,6 +18,7 @@
       <div id="profile-btn-wrap" class="profile-btn-wrap"></div>
     </header>
 
+    <div class="setup-body">
     <main class="setup-main">
       <!-- Teams section -->
       <section class="setup-section">
@@ -109,6 +110,28 @@
       <button id="btn-start-game" class="btn-primary btn-large" disabled>Start Game</button>
       <p id="setup-error" class="error-msg"></p>
     </main>
+
+    <!-- ═══════════════════════════ INFO PANEL -->
+    <aside class="setup-info" id="setup-info">
+
+      <div class="info-card">
+        <div class="info-card-icon">⭐</div>
+        <h3 class="info-card-title">Spotify Premium required</h3>
+        <p class="info-card-body">Hitster controls music playback through your Spotify account. A <strong>Premium subscription</strong> is needed to play and control songs during the game.</p>
+      </div>
+
+      <div class="info-card" id="info-account">
+        <!-- Rendered by JS: connected account or Connect button -->
+      </div>
+
+      <div class="info-card">
+        <div class="info-card-icon">📱</div>
+        <h3 class="info-card-title">An active device is needed</h3>
+        <p class="info-card-body">Before starting, open Spotify on your phone, computer, or speaker and play any song. This sets it as the active playback device Hitster will control.</p>
+      </div>
+
+    </aside>
+    </div><!-- /.setup-body -->
   </div>
 
   <!-- ══════════════════════════════════════ OAUTH REQUIRED OVERLAY -->
