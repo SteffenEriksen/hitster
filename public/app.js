@@ -478,6 +478,16 @@ function renderProfileButton() {
 
 // ─── Boot ─────────────────────────────────────────────────────────────────────
 
+function showConnectModal(errorMsg) {
+  const modal  = document.getElementById('connect-modal');
+  const errEl  = document.getElementById('connect-modal-error');
+  if (errorMsg) {
+    errEl.textContent = errorMsg;
+    errEl.classList.remove('hidden');
+  }
+  modal.classList.remove('hidden');
+}
+
 (async () => {
   // Handle PKCE callback (Spotify redirects back to / with ?code=...&state=pkce_personal)
   const params = new URLSearchParams(location.search);
@@ -496,7 +506,22 @@ function renderProfileButton() {
     else if (activePlaylistTab === 'search') loadSearchPlaylists(dom.playlistSearchInput.value);
     else                                     loadOfficialPlaylists(true);
   });
-})();
 
-initTeamInputs();
-loadMyPlaylists();
+  initTeamInputs();
+
+  // Check Spotify connection — use fetch directly to avoid the oauth-required overlay
+  try {
+    const res = await fetch('/auth/status');
+    const s   = await res.json();
+    if (!s.oauthLinked && !s.envAuth) {
+      const authError = params.get('auth_error');
+      showConnectModal(authError ? 'Could not connect: ' + decodeURIComponent(authError) + '. Please try again.' : null);
+      return;
+    }
+  } catch (_) {
+    showConnectModal(null);
+    return;
+  }
+
+  loadMyPlaylists();
+})();

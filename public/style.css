@@ -106,6 +106,61 @@
 }
 .btn-oauth-retry:hover { border-color: var(--green); color: var(--green); }
 
+/* ─── Connect modal (shown on load when no Spotify session) ──────────────── */
+.connect-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.65);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 200;
+  padding: 24px;
+  backdrop-filter: blur(4px);
+}
+.connect-modal-card {
+  background: #fff;
+  border-radius: 20px;
+  padding: 40px 36px;
+  max-width: 400px;
+  width: 100%;
+  text-align: center;
+  box-shadow: 0 24px 60px rgba(0,0,0,0.35);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+.connect-modal-icon  { font-size: 2.8rem; line-height: 1; }
+.connect-modal-title { font-size: 1.3rem; font-weight: 800; color: #111827; }
+.connect-modal-body  { font-size: 0.92rem; color: #6b7280; line-height: 1.55; }
+.connect-modal-error {
+  font-size: 0.82rem;
+  color: #dc2626;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  padding: 8px 14px;
+  width: 100%;
+}
+.btn-spotify-connect {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  background: #1DB954;
+  color: #fff;
+  font-weight: 700;
+  font-size: 0.95rem;
+  font-family: inherit;
+  padding: 14px 28px;
+  border-radius: 50px;
+  text-decoration: none;
+  transition: background 0.15s, transform 0.1s;
+  margin-top: 4px;
+}
+.btn-spotify-connect:hover  { background: #17a349; }
+.btn-spotify-connect:active { transform: scale(0.97); }
+
 /* ─── Reset & Tokens ─────────────────────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
