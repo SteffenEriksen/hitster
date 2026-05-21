@@ -607,6 +607,69 @@ button { cursor: pointer; font-family: inherit; border: none; outline: none; }
 
 .playlist-info { font-size: 0.82rem; color: var(--grey-600); margin-top: 6px; }
 
+/* Add playlist button */
+.btn-add-playlist {
+  white-space: nowrap;
+  font-weight: 700;
+  font-size: 0.82rem;
+  padding: 8px 14px;
+  border-radius: var(--radius-sm);
+  flex-shrink: 0;
+}
+
+/* Selected playlists chip list */
+.selected-playlists { margin-top: 8px; }
+.selected-empty {
+  font-size: 0.8rem;
+  color: var(--grey-400);
+  font-style: italic;
+  padding: 2px 0;
+}
+.selected-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.playlist-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--green);
+  color: #fff;
+  border-radius: 20px;
+  padding: 5px 6px 5px 12px;
+  font-size: 0.8rem;
+  max-width: 100%;
+}
+.playlist-chip-name {
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 180px;
+}
+.playlist-chip-count {
+  opacity: 0.75;
+  font-size: 0.72rem;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.playlist-chip-remove {
+  background: rgba(255,255,255,0.25);
+  border: none;
+  color: #fff;
+  border-radius: 50%;
+  width: 18px;
+  height: 18px;
+  font-size: 0.75rem;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: background 0.12s;
+  padding: 0;
+}
+.playlist-chip-remove:hover { background: rgba(255,255,255,0.45); }
+.selected-total { font-size: 0.78rem; color: var(--grey-500); margin-top: 8px; }
+
 /* Personal Spotify */
 .personal-spotify-badge {
   font-size: 0.7rem;

@@ -28,6 +28,7 @@ let   officialPlaylistsCache = null;
 let   activePlaylistTab     = 'my';   // 'my' | 'all' | 'search' | 'official'
 let   minTracksFilter       = 50;     // null = no filter
 let   lastSearchResults     = null;   // cached raw search results for re-filtering
+let   selectedPlaylists     = [];     // [{ id, name, trackCount }] — playlists added to the game
 
 // ─── DOM refs (setup screen) ──────────────────────────────────────────────────
 
@@ -39,6 +40,7 @@ const dom = {
   btnCardsPlus:   $('btn-cards-plus'),
   cardsDisplay:   $('cards-to-win-display'),
   playlistSelect: $('playlist-select'),
+  btnAddPlaylist: $('btn-add-playlist'),
   btnRefresh:     $('btn-refresh-playlists'),
   tabMy:          $('tab-my'),
   tabAll:         $('tab-all'),
@@ -51,6 +53,7 @@ const dom = {
   btnPlaylistSearch:   $('btn-playlist-search'),
   playlistSizeFilter:  $('playlist-size-filter'),
   playlistInfo:   $('playlist-info'),
+  selectedPlaylists: $('selected-playlists'),
   btnStartGame:   $('btn-start-game'),
   setupError:     $('setup-error'),
 };
@@ -82,7 +85,7 @@ function setSelectOptions(playlists, showOwner) {
     const label = showOwner
       ? pl.name + ' (' + pl.trackCount + ' tracks) — ' + pl.owner
       : pl.name + ' (' + pl.trackCount + ' tracks)';
-    return '<option value="' + pl.id + '" data-count="' + pl.trackCount + '">' + label + '</option>';
+    return '<option value="' + pl.id + '" data-count="' + pl.trackCount + '" data-name="' + esc(pl.name) + '">' + label + '</option>';
   }).join('');
   updatePlaylistInfo();
   checkSetupReady();
@@ -213,7 +216,49 @@ function showYearRange(tracks) {
 function checkSetupReady() {
   const inputs = dom.teamInputs.querySelectorAll('.team-name-input');
   const filled = [...inputs].filter(i => i.value.trim()).length;
-  dom.btnStartGame.disabled = filled < 2 || !dom.playlistSelect.value;
+  dom.btnStartGame.disabled = filled < 2 || selectedPlaylists.length === 0;
+  dom.btnAddPlaylist.disabled = !dom.playlistSelect.value;
+}
+
+function renderSelectedPlaylists() {
+  if (selectedPlaylists.length === 0) {
+    dom.selectedPlaylists.innerHTML =
+      '<p class="selected-empty">No playlists added — select one above and click <strong>＋ Add</strong>.</p>';
+    return;
+  }
+  const total = selectedPlaylists.reduce((s, pl) => s + pl.trackCount, 0);
+  dom.selectedPlaylists.innerHTML =
+    '<div class="selected-chips">' +
+    selectedPlaylists.map(pl =>
+      '<div class="playlist-chip">' +
+        '<span class="playlist-chip-name">' + esc(pl.name) + '</span>' +
+        '<span class="playlist-chip-count">' + pl.trackCount + ' tracks</span>' +
+        '<button class="playlist-chip-remove" data-id="' + esc(pl.id) + '" title="Remove">×</button>' +
+      '</div>'
+    ).join('') +
+    '</div>' +
+    (selectedPlaylists.length > 1
+      ? '<p class="selected-total">~' + total + ' tracks total across ' + selectedPlaylists.length + ' playlists</p>'
+      : '');
+}
+
+function addPlaylist() {
+  const opt = dom.playlistSelect.selectedOptions[0];
+  if (!opt || !opt.value) return;
+  if (selectedPlaylists.some(pl => pl.id === opt.value)) return;
+  selectedPlaylists.push({
+    id:         opt.value,
+    name:       opt.dataset.name || opt.text.split(/\s+\(\d+/)[0],
+    trackCount: parseInt(opt.dataset.count, 10) || 0,
+  });
+  renderSelectedPlaylists();
+  checkSetupReady();
+}
+
+function removePlaylist(id) {
+  selectedPlaylists = selectedPlaylists.filter(pl => pl.id !== id);
+  renderSelectedPlaylists();
+  checkSetupReady();
 }
 
 function makeTeamRow(n) {
@@ -276,13 +321,27 @@ async function startGame() {
   dom.btnStartGame.textContent = 'Loading tracks…';
 
   try {
-    const playlistId = dom.playlistSelect.value;
-    const tracks     = tracksCache[playlistId] || await api.tracks(playlistId);
-    tracksCache[playlistId] = tracks;
-    applyYearCache(tracks);
+    // Fetch tracks for every selected playlist (parallel, reuse cache)
+    const trackArrays = await Promise.all(
+      selectedPlaylists.map(async pl => {
+        const tracks = tracksCache[pl.id] || await api.tracks(pl.id);
+        tracksCache[pl.id] = tracks;
+        return tracks;
+      })
+    );
 
-    if (tracks.length < 5) {
-      dom.setupError.textContent   = 'Playlist needs at least 5 tracks with release years.';
+    // Merge and deduplicate by track ID
+    const seenIds = new Set();
+    const allTracks = [];
+    for (const tracks of trackArrays) {
+      for (const t of tracks) {
+        if (!seenIds.has(t.id)) { seenIds.add(t.id); allTracks.push(t); }
+      }
+    }
+    applyYearCache(allTracks);
+
+    if (allTracks.length < 5) {
+      dom.setupError.textContent   = 'Selected playlists need at least 5 tracks with release years.';
       dom.btnStartGame.disabled    = false;
       dom.btnStartGame.textContent = 'Start Game';
       return;
@@ -299,24 +358,25 @@ async function startGame() {
     const hardModeAll   = $('toggle-hard-all').checked;
 
     // Build shuffled deck and deal one starter card to each team
-    const deck = shuffle([...tracks]);
+    const deck = shuffle([...allTracks]);
     teams.forEach(team => {
       if (deck.length > 0) team.cards.push(deck.shift());
     });
 
-    const opt          = dom.playlistSelect.selectedOptions[0];
-    const playlistName = opt ? opt.text.replace(/\s*\(\d[\d\s,]*tracks?\)$/i, '').trim() : '';
-    const years = tracks.map(t => t.year).filter(Boolean);
+    const years = allTracks.map(t => t.year).filter(Boolean);
     const minY  = years.length ? Math.min(...years) : null;
     const maxY  = years.length ? Math.max(...years) : null;
-    const playlistInfoStr = playlistName + (minY && maxY ? '  ·  ' + minY + ' – ' + maxY : '');
+    const playlistInfoStr = selectedPlaylists.length === 1
+      ? selectedPlaylists[0].name + (minY && maxY ? '  ·  ' + minY + ' – ' + maxY : '')
+      : selectedPlaylists.length + ' playlists · ' + allTracks.length + ' tracks' +
+        (minY && maxY ? '  ·  ' + minY + ' – ' + maxY : '');
 
     sessionStorage.setItem('hitster_game', JSON.stringify({
       teams,
       cardsToWin,
       hardModeFinal,
       hardModeAll,
-      allTracks:     tracks,
+      allTracks,
       deck,
       activeTeams:   teams.map((_, i) => i),
       activeCursor:  0,
@@ -345,6 +405,12 @@ dom.btnCardsPlus.addEventListener('click', () => {
   if (n < 20) dom.cardsDisplay.textContent = n + 1;
 });
 dom.playlistSelect.addEventListener('change', () => { updatePlaylistInfo(); checkSetupReady(); });
+dom.btnAddPlaylist.addEventListener('click', addPlaylist);
+dom.playlistSelect.addEventListener('dblclick', addPlaylist);
+dom.selectedPlaylists.addEventListener('click', e => {
+  const btn = e.target.closest('.playlist-chip-remove');
+  if (btn) removePlaylist(btn.dataset.id);
+});
 dom.btnRefresh.addEventListener('click', () => {
   if (activePlaylistTab === 'my')       loadMyPlaylists(true);
   else if (activePlaylistTab === 'all') loadAllPlaylists(true);
@@ -527,6 +593,7 @@ function renderInfoPanel(authStatus) {
   });
 
   initTeamInputs();
+  renderSelectedPlaylists();
 
   // Check Spotify connection — use fetch directly to avoid the oauth-required overlay
   try {
