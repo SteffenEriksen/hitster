@@ -669,6 +669,7 @@ button { cursor: pointer; font-family: inherit; border: none; outline: none; }
 }
 .playlist-chip-remove:hover { background: rgba(255,255,255,0.45); }
 .selected-total { font-size: 0.78rem; color: var(--grey-500); margin-top: 8px; }
+.selected-dupes { color: var(--grey-400); font-style: italic; }
 
 /* Personal Spotify */
 .personal-spotify-badge {
@@ -773,7 +774,10 @@ button { cursor: pointer; font-family: inherit; border: none; outline: none; }
   display: flex;
   align-items: center;
   gap: 6px;
-  margin-top: 10px;
+  margin: 16px 0;
+  padding: 10px 0;
+  border-top: 1px solid var(--grey-100);
+  border-bottom: 1px solid var(--grey-100);
 }
 .psf-label {
   font-size: 0.75rem;

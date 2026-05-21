@@ -199,6 +199,7 @@ async function updatePlaylistInfo() {
     applyYearCache(tracks);
     tracksCache[playlistId] = tracks;
     showYearRange(tracks);
+    renderSelectedPlaylists(); // update unique count if this playlist is now in the selection
   } catch (_) {
     if (seq !== infoFetchSeq) return;
     dom.playlistInfo.textContent = (opt.dataset.count || '?') + ' tracks';
@@ -220,14 +221,25 @@ function checkSetupReady() {
   dom.btnAddPlaylist.disabled = !dom.playlistSelect.value;
 }
 
+function getUniqueTrackCount() {
+  // Returns the actual deduplicated count if all selected playlists are cached,
+  // otherwise returns null (fall back to estimated sum).
+  if (!selectedPlaylists.every(pl => tracksCache[pl.id])) return null;
+  const seen = new Set();
+  for (const pl of selectedPlaylists) {
+    for (const t of tracksCache[pl.id]) seen.add(t.id);
+  }
+  return seen.size;
+}
+
 function renderSelectedPlaylists() {
   if (selectedPlaylists.length === 0) {
     dom.selectedPlaylists.innerHTML =
       '<p class="selected-empty">No playlists added — select one above and click <strong>＋ Add</strong>.</p>';
     return;
   }
-  const total = selectedPlaylists.reduce((s, pl) => s + pl.trackCount, 0);
-  dom.selectedPlaylists.innerHTML =
+
+  const chips =
     '<div class="selected-chips">' +
     selectedPlaylists.map(pl =>
       '<div class="playlist-chip">' +
@@ -236,10 +248,25 @@ function renderSelectedPlaylists() {
         '<button class="playlist-chip-remove" data-id="' + esc(pl.id) + '" title="Remove">×</button>' +
       '</div>'
     ).join('') +
-    '</div>' +
-    (selectedPlaylists.length > 1
-      ? '<p class="selected-total">~' + total + ' tracks total across ' + selectedPlaylists.length + ' playlists</p>'
-      : '');
+    '</div>';
+
+  let summary = '';
+  if (selectedPlaylists.length > 1) {
+    const rawTotal  = selectedPlaylists.reduce((s, pl) => s + pl.trackCount, 0);
+    const unique    = getUniqueTrackCount();
+    if (unique !== null) {
+      const dupes = rawTotal - unique;
+      summary = '<p class="selected-total">' + unique + ' unique tracks across ' +
+        selectedPlaylists.length + ' playlists' +
+        (dupes > 0 ? ' <span class="selected-dupes">(' + dupes + ' duplicates removed)</span>' : '') +
+        '</p>';
+    } else {
+      summary = '<p class="selected-total">~' + rawTotal + ' tracks across ' +
+        selectedPlaylists.length + ' playlists</p>';
+    }
+  }
+
+  dom.selectedPlaylists.innerHTML = chips + summary;
 }
 
 function addPlaylist() {
