@@ -1018,52 +1018,29 @@ button { cursor: pointer; font-family: inherit; border: none; outline: none; }
 }
 
 /* Hard-mode in-game control (sits in game-header-center) */
-.hard-mode-ctl {
+.game-settings-ctl {
   margin-top: 6px;
   display: flex;
   justify-content: center;
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
-  min-height: 22px;   /* prevent header jump when contents change */
+  min-height: 22px;
 }
-.btn-enable-hard {
+.btn-game-settings {
   background: rgba(255,255,255,0.1);
-  color: rgba(255,255,255,0.8);
+  color: rgba(255,255,255,0.85);
   border: 1px solid rgba(255,255,255,0.3);
   border-radius: 20px;
   padding: 3px 12px;
   font-size: 0.72rem;
   font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
   white-space: nowrap;
   transition: background 0.15s;
 }
-.btn-enable-hard:hover { background: rgba(255,255,255,0.22); }
-.btn-disable-hard {
-  background: rgba(255,255,255,0.22);
-  color: var(--white);
-  border: 1px solid rgba(255,255,255,0.5);
-  border-radius: 20px;
-  padding: 3px 12px;
-  font-size: 0.72rem;
-  font-weight: 600;
-  white-space: nowrap;
-  cursor: pointer;
-  transition: background 0.15s, border-color 0.15s;
-}
-.btn-disable-hard:hover { background: rgba(255,255,255,0.1); border-color: rgba(255,255,255,0.3); }
-.hard-enable-confirm {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-  justify-content: center;
-}
-.hard-enable-text {
-  font-size: 0.72rem;
-  color: rgba(255,255,255,0.85);
-  white-space: nowrap;
-}
+.btn-game-settings:hover { background: rgba(255,255,255,0.22); }
 .hard-mode-badge {
   background: rgba(255,255,255,0.15);
   color: rgba(255,255,255,0.9);
@@ -1073,20 +1050,64 @@ button { cursor: pointer; font-family: inherit; border: none; outline: none; }
   font-weight: 600;
   white-space: nowrap;
 }
-/* btn-ghost and btn-primary need to be legible on the dark-green header */
-.hard-enable-confirm .btn-ghost {
-  border-color: rgba(255,255,255,0.5);
-  color: rgba(255,255,255,0.85);
+
+/* Game settings overlay */
+.game-settings-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 200;
+  padding: 24px;
+  backdrop-filter: blur(3px);
 }
-.hard-enable-confirm .btn-ghost:hover {
-  background: rgba(255,255,255,0.15);
-  color: var(--white);
+.game-settings-card {
+  background: #fff;
+  border-radius: 20px;
+  padding: 28px 28px 24px;
+  max-width: 380px;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  box-shadow: 0 24px 60px rgba(0,0,0,0.3);
 }
-.hard-enable-confirm .btn-primary {
-  background: #009090;
+.gs-title { font-size: 1.1rem; font-weight: 800; color: #111827; margin: 0; }
+.gs-section {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 4px 0;
 }
-.hard-enable-confirm .btn-primary:hover { background: #00a8a8; }
-.hard-enable-confirm .btn-sm { padding: 4px 12px; font-size: 0.75rem; }
+.gs-section-label { font-size: 0.9rem; font-weight: 600; color: var(--grey-800); }
+.gs-num-row { display: flex; align-items: center; gap: 10px; }
+.gs-cards-num { font-size: 1.3rem; font-weight: 800; color: var(--grey-900); min-width: 28px; text-align: center; }
+.gs-toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  cursor: pointer;
+  padding: 6px 0;
+  border-top: 1px solid var(--grey-100);
+  user-select: none;
+}
+.gs-toggle-info { display: flex; flex-direction: column; gap: 2px; }
+.gs-toggle-name { font-size: 0.88rem; font-weight: 600; color: var(--grey-800); }
+.gs-toggle-desc { font-size: 0.75rem; color: var(--grey-500); line-height: 1.35; }
+.gs-hard-note {
+  font-size: 0.78rem;
+  color: #92400e;
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  border-radius: 8px;
+  padding: 8px 12px;
+  margin: 0;
+}
+.gs-actions { display: flex; gap: 10px; justify-content: flex-end; padding-top: 4px; }
 
 /* Score chips */
 .score-chips { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }

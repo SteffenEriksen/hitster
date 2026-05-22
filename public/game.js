@@ -12,16 +12,18 @@ const dom = {
   gamePlaylistInfo:   $('game-playlist-info'),
   tbBadge:            $('tb-badge'),
   matchPointBanner:   $('match-point-banner'),
-  // Hard-mode controls
-  btnEnableHard:      $('btn-enable-hard'),
-  hardEnableConfirm:  $('hard-enable-confirm'),
-  btnHardYes:         $('btn-hard-yes'),
-  btnHardNo:          $('btn-hard-no'),
-  btnDisableHard:     $('btn-disable-hard'),
-  hardDisableConfirm: $('hard-disable-confirm'),
-  btnHardDisableYes:  $('btn-hard-disable-yes'),
-  btnHardDisableNo:   $('btn-hard-disable-no'),
   hardModeBadge:      $('hard-mode-badge'),
+  // Game settings overlay
+  btnGameSettings:    $('btn-game-settings'),
+  gameSettingsOverlay:$('game-settings-overlay'),
+  gsCardsMinus:       $('gs-cards-minus'),
+  gsCardsPlus:        $('gs-cards-plus'),
+  gsCardsDisplay:     $('gs-cards-display'),
+  gsHardFinal:        $('gs-hard-final'),
+  gsHardAll:          $('gs-hard-all'),
+  gsHardNote:         $('gs-hard-note'),
+  btnGsApply:         $('btn-gs-apply'),
+  btnGsCancel:        $('btn-gs-cancel'),
   // Music controls
   musicControls:    $('music-controls'),
   btnPauseResume:   $('btn-pause-resume'),
@@ -298,27 +300,86 @@ function showStartingCards() {
 // ─── Hard-mode in-game control ────────────────────────────────────────────────
 
 function syncHardModeCtl() {
-  dom.hardEnableConfirm.classList.add('hidden');
-  dom.hardDisableConfirm.classList.add('hidden');
+  const badge = dom.hardModeBadge;
   if (state._hardModePending) {
-    dom.btnEnableHard.classList.add('hidden');
-    dom.btnDisableHard.classList.add('hidden');
-    dom.hardModeBadge.textContent = '🧠 Hard Mode: next round';
-    dom.hardModeBadge.classList.remove('hidden');
+    badge.textContent = '🧠 Hard Mode: next round';
+    badge.classList.remove('hidden');
   } else if (state._hardModeDisablePending) {
-    dom.btnEnableHard.classList.add('hidden');
-    dom.btnDisableHard.classList.add('hidden');
-    dom.hardModeBadge.textContent = '🧠 Disabling: next round';
-    dom.hardModeBadge.classList.remove('hidden');
+    badge.textContent = '🧠 Disabling: next round';
+    badge.classList.remove('hidden');
   } else if (state.hardModeAll) {
-    dom.btnEnableHard.classList.add('hidden');
-    dom.btnDisableHard.classList.remove('hidden');
-    dom.hardModeBadge.classList.add('hidden');
+    badge.textContent = '🧠 Hard Mode ON';
+    badge.classList.remove('hidden');
+  } else if (state.hardModeFinal) {
+    badge.textContent = '🧠 Hard: last card';
+    badge.classList.remove('hidden');
   } else {
-    dom.btnEnableHard.classList.remove('hidden');
-    dom.btnDisableHard.classList.add('hidden');
-    dom.hardModeBadge.classList.add('hidden');
+    badge.classList.add('hidden');
   }
+}
+
+// ─── Game settings ────────────────────────────────────────────────────────────
+
+let _gsCardsToWin = 8;          // working value inside the panel
+let _gsOpenCardsToWin = 8;      // cardsToWin when panel was opened (used for floor calc)
+
+function openGameSettings() {
+  // Snapshot current state into the panel
+  _gsCardsToWin = state.cardsToWin;
+  _gsOpenCardsToWin = state.cardsToWin;
+
+  dom.gsCardsDisplay.textContent  = _gsCardsToWin;
+  dom.gsHardFinal.checked         = state.hardModeFinal;
+  dom.gsHardAll.checked           = state.hardModeAll || state._hardModePending;
+  dom.gsHardNote.classList.add('hidden');
+  _updateGsCardsButtons();
+  dom.gameSettingsOverlay.classList.remove('hidden');
+}
+
+function _gsMinCards() {
+  // Floor: one above the current highest score, UNLESS cardsToWin was already
+  // at or below the high score when the panel opened (keep that as the floor).
+  const maxScore = Math.max(0, ...state.teams.map(t => t.cards.length));
+  return Math.min(_gsOpenCardsToWin, maxScore + 1);
+}
+
+function _updateGsCardsButtons() {
+  dom.gsCardsMinus.disabled = _gsCardsToWin <= _gsMinCards();
+  dom.gsCardsPlus.disabled  = _gsCardsToWin >= 20;
+}
+
+function applyGameSettings() {
+  const newHardFinal = dom.gsHardFinal.checked;
+  const newHardAll   = dom.gsHardAll.checked;
+
+  // Cards to win — immediate effect
+  state.cardsToWin = _gsCardsToWin;
+
+  // Hard mode final — immediate effect
+  state.hardModeFinal = newHardFinal;
+
+  // Hard mode all — deferred if a round is in progress
+  if (newHardAll !== (state.hardModeAll || state._hardModePending)) {
+    if (state.roundTeamsDone === 0) {
+      state.hardModeAll             = newHardAll;
+      state._hardModePending        = false;
+      state._hardModeDisablePending = false;
+    } else if (newHardAll) {
+      state._hardModePending        = true;
+      state._hardModeDisablePending = false;
+    } else {
+      state._hardModeDisablePending = true;
+      state._hardModePending        = false;
+    }
+  }
+
+  syncHardModeCtl();
+  dom.gameSettingsOverlay.classList.add('hidden');
+
+  // Re-render header in case cardsToWin changed (match-point banner etc.)
+  renderCurrentTeamBar();
+  renderOtherTeams();
+  renderScoreChips();
 }
 
 // ─── Phase transitions ────────────────────────────────────────────────────────
@@ -957,32 +1018,32 @@ dom.btnSdFight.addEventListener('click', () => {
   enterPreTurn();
 });
 
-dom.btnEnableHard.addEventListener('click', () => {
-  dom.btnEnableHard.classList.add('hidden');
-  dom.hardEnableConfirm.classList.remove('hidden');
+// Game settings
+dom.btnGameSettings.addEventListener('click', openGameSettings);
+dom.btnGsCancel.addEventListener('click', () => {
+  dom.gameSettingsOverlay.classList.add('hidden');
 });
-dom.btnHardNo.addEventListener('click', () => { syncHardModeCtl(); });
-dom.btnHardYes.addEventListener('click', () => {
-  if (state.roundTeamsDone === 0) {
-    state.hardModeAll = true;
-  } else {
-    state._hardModePending = true;
+dom.btnGsApply.addEventListener('click', applyGameSettings);
+
+dom.gsCardsMinus.addEventListener('click', () => {
+  if (_gsCardsToWin > _gsMinCards()) {
+    _gsCardsToWin--;
+    dom.gsCardsDisplay.textContent = _gsCardsToWin;
+    _updateGsCardsButtons();
   }
-  syncHardModeCtl();
+});
+dom.gsCardsPlus.addEventListener('click', () => {
+  if (_gsCardsToWin < 20) {
+    _gsCardsToWin++;
+    dom.gsCardsDisplay.textContent = _gsCardsToWin;
+    _updateGsCardsButtons();
+  }
 });
 
-dom.btnDisableHard.addEventListener('click', () => {
-  dom.btnDisableHard.classList.add('hidden');
-  dom.hardDisableConfirm.classList.remove('hidden');
-});
-dom.btnHardDisableNo.addEventListener('click', () => { syncHardModeCtl(); });
-dom.btnHardDisableYes.addEventListener('click', () => {
-  if (state.roundTeamsDone === 0) {
-    state.hardModeAll = false;
-  } else {
-    state._hardModeDisablePending = true;
-  }
-  syncHardModeCtl();
+// Show the "next round" note when hard-all is toggled while a round is in progress
+dom.gsHardAll.addEventListener('change', () => {
+  const changing = dom.gsHardAll.checked !== (state.hardModeAll || state._hardModePending);
+  dom.gsHardNote.classList.toggle('hidden', !(changing && state.roundTeamsDone > 0));
 });
 
 dom.btnRetryPlay.addEventListener('click', async () => {

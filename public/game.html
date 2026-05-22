@@ -19,19 +19,8 @@
       <div class="game-header-center">
         <span id="deck-counter" class="deck-counter">0 cards left</span>
         <span id="tb-badge" class="tb-badge hidden">⚡ SUDDEN DEATH</span>
-        <div class="hard-mode-ctl">
-          <button id="btn-enable-hard"  class="btn-enable-hard hidden">🧠 Enable Hard Mode</button>
-          <div id="hard-enable-confirm" class="hard-enable-confirm hidden">
-            <span class="hard-enable-text">Enable hard mode on all turns?</span>
-            <button id="btn-hard-yes" class="btn-primary btn-sm">✓ Enable</button>
-            <button id="btn-hard-no"  class="btn-ghost  btn-sm">✗ Cancel</button>
-          </div>
-          <button id="btn-disable-hard" class="btn-disable-hard hidden">🧠 Hard Mode ON</button>
-          <div id="hard-disable-confirm" class="hard-enable-confirm hidden">
-            <span class="hard-enable-text">Disable hard mode?</span>
-            <button id="btn-hard-disable-yes" class="btn-primary btn-sm">✓ Disable</button>
-            <button id="btn-hard-disable-no"  class="btn-ghost  btn-sm">✗ Cancel</button>
-          </div>
+        <div class="game-settings-ctl">
+          <button id="btn-game-settings" class="btn-game-settings">⚙ Settings</button>
           <span id="hard-mode-badge" class="hard-mode-badge hidden"></span>
         </div>
       </div>
@@ -194,6 +183,53 @@
       <p id="oauth-overlay-msg" class="oauth-overlay-msg"></p>
       <a id="oauth-overlay-login" href="/auth/login" class="btn-oauth-login hidden">Login with Spotify</a>
       <button id="oauth-overlay-retry" class="btn-oauth-retry">Retry</button>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════ GAME SETTINGS OVERLAY -->
+  <div id="game-settings-overlay" class="game-settings-overlay hidden">
+    <div class="game-settings-card">
+      <h3 class="gs-title">⚙ Game Settings</h3>
+
+      <!-- Cards to win -->
+      <div class="gs-section">
+        <span class="gs-section-label">Cards to Win</span>
+        <div class="gs-num-row">
+          <button id="gs-cards-minus" class="btn-ghost btn-num">−</button>
+          <span id="gs-cards-display" class="gs-cards-num">8</span>
+          <button id="gs-cards-plus" class="btn-ghost btn-num">+</button>
+        </div>
+      </div>
+
+      <!-- Hard mode toggles -->
+      <label class="gs-toggle-row">
+        <div class="gs-toggle-info">
+          <span class="gs-toggle-name">Hard mode — last card</span>
+          <span class="gs-toggle-desc">Must name title &amp; artist when one card away from winning</span>
+        </div>
+        <span class="toggle-switch-wrap">
+          <input type="checkbox" id="gs-hard-final" class="toggle-check">
+          <span class="toggle-track"><span class="toggle-thumb"></span></span>
+        </span>
+      </label>
+
+      <label class="gs-toggle-row">
+        <div class="gs-toggle-info">
+          <span class="gs-toggle-name">Hard mode — all turns</span>
+          <span class="gs-toggle-desc">Must name title &amp; artist on every placement</span>
+        </div>
+        <span class="toggle-switch-wrap">
+          <input type="checkbox" id="gs-hard-all" class="toggle-check">
+          <span class="toggle-track"><span class="toggle-thumb"></span></span>
+        </span>
+      </label>
+
+      <p id="gs-hard-note" class="gs-hard-note hidden">🕐 Hard mode changes take effect at the start of the next round.</p>
+
+      <div class="gs-actions">
+        <button id="btn-gs-apply"  class="btn-primary">✓ Apply</button>
+        <button id="btn-gs-cancel" class="btn-ghost">Cancel</button>
+      </div>
     </div>
   </div>
 
