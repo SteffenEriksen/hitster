@@ -94,6 +94,14 @@ const dom = {
   endGameConfirm:    $('end-game-confirm'),
   btnEndGameYes:     $('btn-end-game-yes'),
   btnEndGameNo:      $('btn-end-game-no'),
+  // Restart game
+  btnRestartGame:      $('btn-restart-game'),
+  restartOverlay:      $('restart-overlay'),
+  btnRestartFull:      $('btn-restart-full'),
+  btnRestartRemaining: $('btn-restart-remaining'),
+  btnRestartCancel:    $('btn-restart-cancel'),
+  restartFullCount:    $('restart-full-count'),
+  restartRemainingCount: $('restart-remaining-count'),
 };
 
 // ─── Game state ───────────────────────────────────────────────────────────────
@@ -764,9 +772,14 @@ function slotLabel(cards, i) {
 function showWinnerScreen(winnerIndices) {
   state.phase = 'finished';
   sessionStorage.setItem('hitster_winner', JSON.stringify({
-    teams:        state.teams,
+    teams:         state.teams,
     winnerIndices,
-    cardsToWin:   state.cardsToWin,
+    cardsToWin:    state.cardsToWin,
+    allTracks:     state.allTracks,
+    deck:          state.deck,
+    hardModeFinal: state.hardModeFinal,
+    hardModeAll:   state.hardModeAll,
+    playlistName:  dom.gamePlaylistInfo.textContent,
   }));
   location.href = 'winner.html';
 }
@@ -783,11 +796,49 @@ function endGame() {
     .filter(({ t }) => t.cards.length === maxCards)
     .map(({ i }) => i);
   sessionStorage.setItem('hitster_winner', JSON.stringify({
-    teams:        state.teams,
+    teams:         state.teams,
     winnerIndices,
-    cardsToWin:   state.cardsToWin,
+    cardsToWin:    state.cardsToWin,
+    allTracks:     state.allTracks,
+    deck:          state.deck,
+    hardModeFinal: state.hardModeFinal,
+    hardModeAll:   state.hardModeAll,
+    playlistName:  dom.gamePlaylistInfo.textContent,
   }));
   location.href = 'winner.html';
+}
+
+function restartGame(mode) {
+  // mode: 'full' | 'remaining'
+  // 'full'      → reshuffle the entire original track pool
+  // 'remaining' → play only the cards still in the deck
+  const pool    = mode === 'remaining' && state.deck.length > 0
+    ? [...state.deck]
+    : [...state.allTracks];
+  const newDeck = shuffle(pool);
+
+  // Reset teams — clear cards but keep names
+  const teams = state.teams.map(t => ({ name: t.name, cards: [] }));
+
+  // Deal one starter card to each team
+  teams.forEach(team => {
+    if (newDeck.length > 0) team.cards.push(newDeck.shift());
+  });
+
+  sessionStorage.setItem('hitster_game', JSON.stringify({
+    teams,
+    cardsToWin:    state.cardsToWin,
+    hardModeFinal: state.hardModeFinal,
+    hardModeAll:   state.hardModeAll,
+    allTracks:     state.allTracks,   // always preserve the full pool
+    deck:          newDeck,
+    activeTeams:   teams.map((_, i) => i),
+    activeCursor:  0,
+    roundTeamsDone: 0,
+    isTiebreaker:  false,
+    playlistName:  dom.gamePlaylistInfo.textContent,
+  }));
+  location.href = 'game.html';
 }
 
 // ─── Event listeners ──────────────────────────────────────────────────────────
@@ -877,6 +928,29 @@ dom.btnEndGameNo.addEventListener('click', () => {
   dom.endGameConfirm.classList.add('hidden');
 });
 dom.btnEndGameYes.addEventListener('click', endGame);
+
+// Restart game
+dom.btnRestartGame.addEventListener('click', () => {
+  // populate counts before showing
+  const fullCount      = state.allTracks.length;
+  const remainingCount = state.deck.length;
+  dom.restartFullCount.textContent      = fullCount + ' songs';
+  dom.restartRemainingCount.textContent = remainingCount > 0 ? remainingCount + ' songs' : 'none left';
+  dom.btnRestartRemaining.disabled      = remainingCount === 0;
+  dom.endGameConfirm.classList.add('hidden');  // close end-game confirm if open
+  dom.restartOverlay.classList.remove('hidden');
+});
+dom.btnRestartCancel.addEventListener('click', () => {
+  dom.restartOverlay.classList.add('hidden');
+});
+dom.btnRestartFull.addEventListener('click', () => {
+  dom.restartOverlay.classList.add('hidden');
+  restartGame('full');
+});
+dom.btnRestartRemaining.addEventListener('click', () => {
+  dom.restartOverlay.classList.add('hidden');
+  restartGame('remaining');
+});
 
 dom.btnSdFight.addEventListener('click', () => {
   dom.suddenDeathOverlay.classList.add('hidden');

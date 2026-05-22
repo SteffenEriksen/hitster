@@ -10,6 +10,10 @@ const dom = {
   winnerSongsWrap: $('winner-songs-wrap'),
   finalScores:     $('final-scores'),
   btnPlayAgain:    $('btn-play-again'),
+  btnWinnerRestartFull:      $('btn-winner-restart-full'),
+  btnWinnerRestartRemaining: $('btn-winner-restart-remaining'),
+  winnerRestartFullCount:      $('winner-restart-full-count'),
+  winnerRestartRemainingCount: $('winner-restart-remaining-count'),
 };
 
 // ─── Winner screen rendering ──────────────────────────────────────────────────
@@ -19,7 +23,8 @@ const WIN_EMOJIS = [
   ['🔥','🏆','🔥'], ['🎵','🥇','🎵'], ['⭐','🏅','⭐'],
 ];
 
-function renderWinnerScreen({ teams, winnerIndices, cardsToWin }) {
+function renderWinnerScreen(winnerData) {
+  const { teams, winnerIndices, allTracks = [], deck = [] } = winnerData;
   const winners = winnerIndices.map(i => teams[i]);
   const isTied  = winners.length > 1;
 
@@ -67,6 +72,11 @@ function renderWinnerScreen({ teams, winnerIndices, cardsToWin }) {
       </div>`
     ).join('');
   dom.finalScores.style.display = others.length === 0 ? 'none' : '';
+
+  // Restart buttons
+  dom.winnerRestartFullCount.textContent      = allTracks.length + ' songs';
+  dom.winnerRestartRemainingCount.textContent = deck.length > 0 ? deck.length + ' songs' : 'none left';
+  dom.btnWinnerRestartRemaining.disabled      = deck.length === 0;
 }
 
 // ─── Confetti ────────────────────────────────────────────────────────────────
@@ -92,6 +102,34 @@ function launchConfetti() {
   }, 600);
 }
 
+// ─── Restart helpers ──────────────────────────────────────────────────────────
+
+function doRestart(mode, winnerData) {
+  const { allTracks = [], deck = [], teams, cardsToWin, hardModeFinal, hardModeAll, playlistName } = winnerData;
+  const pool    = mode === 'remaining' && deck.length > 0 ? [...deck] : [...allTracks];
+  const newDeck = shuffle(pool);
+
+  const newTeams = teams.map(t => ({ name: t.name, cards: [] }));
+  newTeams.forEach(team => {
+    if (newDeck.length > 0) team.cards.push(newDeck.shift());
+  });
+
+  sessionStorage.setItem('hitster_game', JSON.stringify({
+    teams:         newTeams,
+    cardsToWin:    cardsToWin,
+    hardModeFinal: hardModeFinal || false,
+    hardModeAll:   hardModeAll   || false,
+    allTracks,
+    deck:          newDeck,
+    activeTeams:   newTeams.map((_, i) => i),
+    activeCursor:  0,
+    roundTeamsDone: 0,
+    isTiebreaker:  false,
+    playlistName:  playlistName || '',
+  }));
+  location.href = 'game.html';
+}
+
 // ─── Event listeners ──────────────────────────────────────────────────────────
 
 dom.btnPlayAgain.addEventListener('click', () => { location.href = '/'; });
@@ -106,6 +144,8 @@ dom.btnPlayAgain.addEventListener('click', () => { location.href = '/'; });
   try { winnerData = JSON.parse(raw); } catch (_) { location.href = '/'; return; }
 
   renderWinnerScreen(winnerData);
+  dom.btnWinnerRestartFull.addEventListener('click',      () => doRestart('full',      winnerData));
+  dom.btnWinnerRestartRemaining.addEventListener('click', () => doRestart('remaining', winnerData));
   // Scroll to top after paint
   requestAnimationFrame(() => { window.scrollTo(0, 0); });
   launchConfetti();
