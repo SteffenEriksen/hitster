@@ -97,8 +97,17 @@ async function loadMyPlaylists(forceReload) {
   dom.btnStartGame.disabled = true;
   dom.setupError.textContent = '';
   try {
-    myPlaylistsCache = await api.playlists();
-    setSelectOptions(myPlaylistsCache, false);
+    let playlists;
+    if (personalSpotify.isConnected()) {
+      const items = await personalSpotify.pagedGet('https://api.spotify.com/v1/me/playlists?limit=50');
+      playlists = items
+        .filter(pl => pl && pl.name.toLowerCase().includes('hitster'))
+        .map(pl => ({ id: pl.id, name: pl.name, trackCount: pl.tracks?.total || 0, imageUrl: pl.images?.[0]?.url || '' }));
+    } else {
+      playlists = await api.playlists();
+    }
+    myPlaylistsCache = playlists;
+    setSelectOptions(playlists, false);
   } catch (e) {
     dom.playlistSelect.innerHTML = '<option value="">Error loading playlists</option>';
     dom.setupError.textContent = e.message;
@@ -111,8 +120,27 @@ async function loadOfficialPlaylists(forceReload) {
   dom.btnStartGame.disabled = true;
   dom.setupError.textContent = '';
   try {
-    officialPlaylistsCache = await api.officialPlaylists();
-    setSelectOptions(officialPlaylistsCache, true);
+    let playlists;
+    if (personalSpotify.isConnected()) {
+      const seen = new Set();
+      playlists = [];
+      for (let offset = 0; offset < 100; offset += 50) {
+        const data = await personalSpotify.jsonGet(
+          `https://api.spotify.com/v1/search?q=hitster&type=playlist&limit=50&offset=${offset}`
+        );
+        for (const pl of (data?.playlists?.items || [])) {
+          if (!pl || !pl.id || seen.has(pl.id)) continue;
+          if (!isAllowedPlaylist(pl.name)) continue;
+          seen.add(pl.id);
+          playlists.push({ id: pl.id, name: pl.name, owner: pl.owner?.display_name || '', trackCount: pl.tracks?.total || 0, imageUrl: pl.images?.[0]?.url || '' });
+        }
+      }
+      playlists.sort((a, b) => a.name.localeCompare(b.name));
+    } else {
+      playlists = await api.officialPlaylists();
+    }
+    officialPlaylistsCache = playlists;
+    setSelectOptions(playlists, true);
   } catch (e) {
     dom.playlistSelect.innerHTML = '<option value="">Error loading playlists</option>';
     dom.setupError.textContent = e.message;
@@ -125,7 +153,16 @@ async function loadAllPlaylists(forceReload) {
   dom.btnStartGame.disabled = true;
   dom.setupError.textContent = '';
   try {
-    allPlaylistsCache = await api.get('/api/all-playlists');
+    let playlists;
+    if (personalSpotify.isConnected()) {
+      const items = await personalSpotify.pagedGet('https://api.spotify.com/v1/me/playlists?limit=50');
+      playlists = items
+        .filter(pl => pl)
+        .map(pl => ({ id: pl.id, name: pl.name, trackCount: pl.tracks?.total || 0, imageUrl: pl.images?.[0]?.url || '' }));
+    } else {
+      playlists = await api.get('/api/all-playlists');
+    }
+    allPlaylistsCache = playlists;
     applyAllPlaylistsFilter();
   } catch (e) {
     dom.playlistSelect.innerHTML = '<option value="">Error loading playlists</option>';
@@ -154,7 +191,17 @@ async function loadSearchPlaylists(q) {
   dom.btnStartGame.disabled = true;
   dom.setupError.textContent = '';
   try {
-    const playlists = await api.get('/api/search-playlists?q=' + encodeURIComponent(q));
+    let playlists;
+    if (personalSpotify.isConnected()) {
+      const data = await personalSpotify.jsonGet(
+        `https://api.spotify.com/v1/search?q=${encodeURIComponent(q)}&type=playlist&limit=50`
+      );
+      playlists = (data?.playlists?.items || [])
+        .filter(pl => pl && pl.id)
+        .map(pl => ({ id: pl.id, name: pl.name, owner: pl.owner?.display_name || '', trackCount: pl.tracks?.total || 0, imageUrl: pl.images?.[0]?.url || '' }));
+    } else {
+      playlists = await api.get('/api/search-playlists?q=' + encodeURIComponent(q));
+    }
     lastSearchResults = playlists;
     setSelectOptions(playlists, true);
   } catch (e) {
@@ -194,7 +241,9 @@ async function updatePlaylistInfo() {
   const seq = ++infoFetchSeq;
   dom.playlistInfo.textContent = 'Loading…';
   try {
-    const tracks = await api.tracks(playlistId);
+    const tracks = personalSpotify.isConnected()
+      ? await fetchPersonalTracks(playlistId)
+      : await api.tracks(playlistId);
     if (seq !== infoFetchSeq) return;
     applyYearCache(tracks);
     tracksCache[playlistId] = tracks;
@@ -351,7 +400,10 @@ async function startGame() {
     // Fetch tracks for every selected playlist (parallel, reuse cache)
     const trackArrays = await Promise.all(
       selectedPlaylists.map(async pl => {
-        const tracks = tracksCache[pl.id] || await api.tracks(pl.id);
+        if (tracksCache[pl.id]) return tracksCache[pl.id];
+        const tracks = personalSpotify.isConnected()
+          ? await fetchPersonalTracks(pl.id)
+          : await api.tracks(pl.id);
         tracksCache[pl.id] = tracks;
         return tracks;
       })
@@ -564,7 +616,19 @@ function renderProfileButton() {
     if (dd) dd.classList.add('hidden');
   }, { once: false });
   const btnLogout = document.getElementById('profile-btn-logout');
-  if (btnLogout) btnLogout.addEventListener('click', () => { personalSpotify.disconnect(); renderProfileButton(); });
+  if (btnLogout) btnLogout.addEventListener('click', () => {
+    personalSpotify.disconnect();
+    // Clear all playlist and track caches so they reload from server API
+    myPlaylistsCache = null; allPlaylistsCache = null;
+    officialPlaylistsCache = null; lastSearchResults = null;
+    Object.keys(tracksCache).forEach(k => delete tracksCache[k]);
+    renderProfileButton();
+    // Reload the active tab from server
+    if (activePlaylistTab === 'my')          loadMyPlaylists(false);
+    else if (activePlaylistTab === 'all')    loadAllPlaylists(false);
+    else if (activePlaylistTab === 'search') loadSearchPlaylists(dom.playlistSearchInput.value);
+    else                                     loadOfficialPlaylists(false);
+  });
   const btnConnect = document.getElementById('profile-btn-connect');
   if (btnConnect) btnConnect.addEventListener('click', () => personalSpotify.login());
 }

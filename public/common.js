@@ -153,15 +153,64 @@ const personalSpotify = {
     init.headers = Object.assign({ 'Authorization': 'Bearer ' + token }, init.headers || {});
     return fetch(url, init);
   },
+
+  /** Fetch JSON from a single Spotify URL, returns parsed object or null. */
+  async jsonGet(url) {
+    const res = await this.spotifyFetch(url);
+    if (!res || !res.ok) return null;
+    return res.json();
+  },
+
+  /** Fetch all pages of a paginated Spotify endpoint, returning all items. */
+  async pagedGet(url) {
+    const results = [];
+    while (url) {
+      const data = await this.jsonGet(url);
+      if (!data) break;
+      results.push(...(data.items || []));
+      url = data.next || null;
+    }
+    return results;
+  },
 };
 
 // ─── Playback wrappers ────────────────────────────────────────────────────────
-// All playback goes through the server's logged-in Spotify account.
+// Personal Spotify (PKCE) is tried first; server account is the fallback.
 
-async function spotifyPlay(uri)             { await api.play(uri); }
-async function spotifyPause()               { await api.pause(); }
-async function spotifyResume()              { await api.resume(); }
-async function spotifySeek(position_ms = 0) { await api.seek(position_ms); }
+async function spotifyPlay(uri) {
+  if (personalSpotify.isConnected()) {
+    const res = await personalSpotify.spotifyFetch('https://api.spotify.com/v1/me/player/play', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ uris: [uri] }),
+    });
+    if (res && res.ok) return;
+  }
+  await api.play(uri);
+}
+
+async function spotifyPause() {
+  if (personalSpotify.isConnected()) {
+    const res = await personalSpotify.spotifyFetch('https://api.spotify.com/v1/me/player/pause', { method: 'PUT' });
+    if (res && (res.ok || res.status === 204)) return;
+  }
+  await api.pause();
+}
+
+async function spotifyResume() {
+  if (personalSpotify.isConnected()) {
+    const res = await personalSpotify.spotifyFetch('https://api.spotify.com/v1/me/player/play', { method: 'PUT' });
+    if (res && (res.ok || res.status === 204)) return;
+  }
+  await api.resume();
+}
+
+async function spotifySeek(position_ms = 0) {
+  if (personalSpotify.isConnected()) {
+    const res = await personalSpotify.spotifyFetch(
+      'https://api.spotify.com/v1/me/player/seek?position_ms=' + position_ms, { method: 'PUT' });
+    if (res && (res.ok || res.status === 204)) return;
+  }
+  await api.seek(position_ms);
+}
 
 // ─── Year localStorage cache ──────────────────────────────────────────────────
 
@@ -284,6 +333,68 @@ function getDecadeVibe(year) {
     if (DECADE_VIBES[d]) return DECADE_VIBES[d];
   }
   return DECADE_VIBES[2020];
+}
+
+// ─── Client-side Spotify data helpers ────────────────────────────────────────
+// These replicate server-side logic so the browser can format Spotify responses
+// directly when using a personal PKCE token.
+
+const _SUSPECT_KW = [
+  'remaster', 'greatest hit', 'best of', 'collection', 'anniversary',
+  'deluxe', 'expanded', 'compilation', 'essential', 'definitive',
+  'very best', 'platinum', 'gold edition', 'complete recording',
+  'legacy edition', 'super deluxe', 'reissue', 'special edition',
+  'box set', 'retrospective', 'the hits', 'all the hits', "now that's",
+  'now music', 'classic', 'icon', 'the ultimate',
+];
+
+const _TITLE_VARIANT_RE = /[\(\[].*(?:remaster|re.?record|re.?release|re.?issue|remix|version|edit|live|radio|acoustic|mono|stereo|anniversary|demo|extended|original mix)[^\)\]]*[\)\]]|\s+-\s+(?:remaster|re.?record|re.?release|re.?issue|remix|live|radio|acoustic|mono|stereo|anniversary|demo|extended)/i;
+
+function _isAlbumSuspect(album) {
+  if (!album) return true;
+  if (album.album_type === 'compilation') return true;
+  const n = (album.name || '').toLowerCase();
+  return _SUSPECT_KW.some(kw => n.includes(kw));
+}
+
+/** Format a raw Spotify track object into the shape the game expects. */
+function clientFormatTrack(t) {
+  if (!t || !t.id) return null;
+  const albumYear    = parseInt((t.album?.release_date || '').split('-')[0]) || null;
+  const titleSuspect = _TITLE_VARIANT_RE.test(t.name);
+  const suspect      = _isAlbumSuspect(t.album) || titleSuspect;
+  return {
+    id:          t.id,
+    title:       t.name,
+    artist:      (t.artists || []).map(a => a.name).join(', '),
+    year:        albumYear,
+    suspect,
+    titleSuspect,
+    isrc:        t.external_ids?.isrc || null,
+    uri:         t.uri,
+    albumArt:    t.album?.images?.[0]?.url || '',
+    duration:    t.duration_ms || 0,
+  };
+}
+
+// Region filter for Official Hitster playlists (mirrors server-side logic)
+const _ALLOWED_REGION_RE  = /\b(norge?|norsk|norway|norwegian|nordic|norden|Sverige|svensk|sweden|swedish|Danmark|dansk|denmark|danish|Suomi|finnish|finland|Island|ísland|iceland|icelandic|UK|british|england|english|US|usa|american)\b/i;
+const _EXCLUDED_REGION_RE = /\b(german[y]?|deutsch|österreich|austri[a]?|schweiz|switzerland|swiss|frankreich|france|fran[cç]ais|español|spain|spania|spanien|ital[yi]a?|brasil|brazil|mexic[oa]|latina?|latam|japan[ese]?|korean?|chinese?|russian?|arabic?|hindi|india[n]?)\b/i;
+
+function isAllowedPlaylist(name) {
+  if (_ALLOWED_REGION_RE.test(name))  return true;
+  if (_EXCLUDED_REGION_RE.test(name)) return false;
+  return true;
+}
+
+/** Fetch all tracks for a playlist using the personal PKCE token. */
+async function fetchPersonalTracks(playlistId) {
+  const fields = 'items(track(id,name,artists,album(name,images,release_date,album_type),uri,duration_ms,external_ids)),next';
+  const url    = `https://api.spotify.com/v1/playlists/${playlistId}/tracks?limit=100&fields=${encodeURIComponent(fields)}`;
+  const items  = await personalSpotify.pagedGet(url);
+  return items
+    .map(item => clientFormatTrack(item?.track))
+    .filter(t => t && t.year);
 }
 
 // ─── Utilities ────────────────────────────────────────────────────────────────
