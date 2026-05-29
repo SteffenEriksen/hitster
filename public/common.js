@@ -191,7 +191,7 @@ const personalSpotify = {
 };
 
 // ─── Playback wrappers ────────────────────────────────────────────────────────
-// Personal Spotify (PKCE) is tried first; server account is the fallback.
+// If personal Spotify is connected it is used exclusively — no silent fallback.
 
 async function spotifyPlay(uri) {
   if (personalSpotify.isConnected()) {
@@ -199,6 +199,9 @@ async function spotifyPlay(uri) {
       method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ uris: [uri] }),
     });
     if (res && res.ok) return;
+    if (!res) throw new Error('Could not reach Spotify — check your connection.');
+    const json = await res.json().catch(() => ({}));
+    throw new Error(json.error?.message || 'Spotify playback error (' + res.status + ')');
   }
   await api.play(uri);
 }
@@ -207,6 +210,9 @@ async function spotifyPause() {
   if (personalSpotify.isConnected()) {
     const res = await personalSpotify.spotifyFetch('https://api.spotify.com/v1/me/player/pause', { method: 'PUT' });
     if (res && (res.ok || res.status === 204)) return;
+    if (!res) throw new Error('Could not reach Spotify.');
+    const json = await res.json().catch(() => ({}));
+    throw new Error(json.error?.message || 'Spotify error (' + res.status + ')');
   }
   await api.pause();
 }
@@ -215,6 +221,9 @@ async function spotifyResume() {
   if (personalSpotify.isConnected()) {
     const res = await personalSpotify.spotifyFetch('https://api.spotify.com/v1/me/player/play', { method: 'PUT' });
     if (res && (res.ok || res.status === 204)) return;
+    if (!res) throw new Error('Could not reach Spotify.');
+    const json = await res.json().catch(() => ({}));
+    throw new Error(json.error?.message || 'Spotify error (' + res.status + ')');
   }
   await api.resume();
 }
@@ -224,6 +233,9 @@ async function spotifySeek(position_ms = 0) {
     const res = await personalSpotify.spotifyFetch(
       'https://api.spotify.com/v1/me/player/seek?position_ms=' + position_ms, { method: 'PUT' });
     if (res && (res.ok || res.status === 204)) return;
+    if (!res) throw new Error('Could not reach Spotify.');
+    const json = await res.json().catch(() => ({}));
+    throw new Error(json.error?.message || 'Spotify error (' + res.status + ')');
   }
   await api.seek(position_ms);
 }

@@ -30,16 +30,11 @@ let   minTracksFilter       = 50;     // null = no filter
 let   lastSearchResults     = null;   // cached raw search results for re-filtering
 let   selectedPlaylists     = [];     // [{ id, name, trackCount }] — playlists added to the game
 
-/** True when personal Spotify is connected AND has playlist read scopes. */
-function _usePersonalPlaylists() {
-  return personalSpotify.isConnected() && personalSpotify.hasPlaylistScope();
-}
-
-/** Show a one-line nudge asking the user to reconnect for playlist access. */
-function _showScopeNudge() {
-  dom.setupError.textContent =
-    '⚠ Your personal Spotify connection needs updated permissions. ' +
-    'Open the profile button → Log out → Connect Spotify to get full access.';
+/** Show a playlist-loading error to the user. */
+function _playlistError(msg) {
+  dom.playlistSelect.innerHTML = '<option value="">' + esc(msg) + '</option>';
+  dom.playlistInfo.textContent  = '';
+  dom.setupError.textContent    = msg;
 }
 
 // ─── DOM refs (setup screen) ──────────────────────────────────────────────────
@@ -110,20 +105,24 @@ async function loadMyPlaylists(forceReload) {
   dom.setupError.textContent = '';
   try {
     let playlists;
-    if (_usePersonalPlaylists()) {
-      try {
-        const items = await personalSpotify.pagedGet('https://api.spotify.com/v1/me/playlists?limit=50');
-        playlists = items
-          .filter(pl => pl && pl.name.toLowerCase().includes('hitster'))
-          .map(pl => ({ id: pl.id, name: pl.name, trackCount: pl.tracks?.total || 0, imageUrl: pl.images?.[0]?.url || '' }));
-      } catch (e) { if (e.name === 'ScopeError') { _showScopeNudge(); } else throw e; }
+    if (personalSpotify.isConnected()) {
+      if (!personalSpotify.hasPlaylistScope()) {
+        _playlistError('⚠ Spotify needs updated permissions — open the profile button, log out, then reconnect.');
+        return;
+      }
+      const items = await personalSpotify.pagedGet('https://api.spotify.com/v1/me/playlists?limit=50');
+      playlists = items
+        .filter(pl => pl && pl.name.toLowerCase().includes('hitster'))
+        .map(pl => ({ id: pl.id, name: pl.name, trackCount: pl.tracks?.total || 0, imageUrl: pl.images?.[0]?.url || '' }));
+    } else {
+      playlists = await api.playlists();
     }
-    if (!playlists) playlists = await api.playlists();
     myPlaylistsCache = playlists;
     setSelectOptions(playlists, false);
   } catch (e) {
-    dom.playlistSelect.innerHTML = '<option value="">Error loading playlists</option>';
-    dom.setupError.textContent = e.message;
+    _playlistError(e.name === 'ScopeError'
+      ? '⚠ Spotify permission error — open the profile button, log out, then reconnect.'
+      : '⚠ Could not load playlists: ' + e.message);
   }
 }
 
@@ -134,30 +133,34 @@ async function loadOfficialPlaylists(forceReload) {
   dom.setupError.textContent = '';
   try {
     let playlists;
-    if (_usePersonalPlaylists()) {
-      try {
-        const seen = new Set();
-        playlists = [];
-        for (let offset = 0; offset < 100; offset += 50) {
-          const data = await personalSpotify.jsonGet(
-            `https://api.spotify.com/v1/search?q=hitster&type=playlist&limit=50&offset=${offset}`
-          );
-          for (const pl of (data?.playlists?.items || [])) {
-            if (!pl || !pl.id || seen.has(pl.id)) continue;
-            if (!isAllowedPlaylist(pl.name)) continue;
-            seen.add(pl.id);
-            playlists.push({ id: pl.id, name: pl.name, owner: pl.owner?.display_name || '', trackCount: pl.tracks?.total || 0, imageUrl: pl.images?.[0]?.url || '' });
-          }
+    if (personalSpotify.isConnected()) {
+      if (!personalSpotify.hasPlaylistScope()) {
+        _playlistError('⚠ Spotify needs updated permissions — open the profile button, log out, then reconnect.');
+        return;
+      }
+      const seen = new Set();
+      playlists = [];
+      for (let offset = 0; offset < 100; offset += 50) {
+        const data = await personalSpotify.jsonGet(
+          `https://api.spotify.com/v1/search?q=hitster&type=playlist&limit=50&offset=${offset}`
+        );
+        for (const pl of (data?.playlists?.items || [])) {
+          if (!pl || !pl.id || seen.has(pl.id)) continue;
+          if (!isAllowedPlaylist(pl.name)) continue;
+          seen.add(pl.id);
+          playlists.push({ id: pl.id, name: pl.name, owner: pl.owner?.display_name || '', trackCount: pl.tracks?.total || 0, imageUrl: pl.images?.[0]?.url || '' });
         }
-        playlists.sort((a, b) => a.name.localeCompare(b.name));
-      } catch (e) { if (e.name === 'ScopeError') { _showScopeNudge(); } else throw e; }
+      }
+      playlists.sort((a, b) => a.name.localeCompare(b.name));
+    } else {
+      playlists = await api.officialPlaylists();
     }
-    if (!playlists) playlists = await api.officialPlaylists();
     officialPlaylistsCache = playlists;
     setSelectOptions(playlists, true);
   } catch (e) {
-    dom.playlistSelect.innerHTML = '<option value="">Error loading playlists</option>';
-    dom.setupError.textContent = e.message;
+    _playlistError(e.name === 'ScopeError'
+      ? '⚠ Spotify permission error — open the profile button, log out, then reconnect.'
+      : '⚠ Could not load playlists: ' + e.message);
   }
 }
 
@@ -168,20 +171,24 @@ async function loadAllPlaylists(forceReload) {
   dom.setupError.textContent = '';
   try {
     let playlists;
-    if (_usePersonalPlaylists()) {
-      try {
-        const items = await personalSpotify.pagedGet('https://api.spotify.com/v1/me/playlists?limit=50');
-        playlists = items
-          .filter(pl => pl)
-          .map(pl => ({ id: pl.id, name: pl.name, trackCount: pl.tracks?.total || 0, imageUrl: pl.images?.[0]?.url || '' }));
-      } catch (e) { if (e.name === 'ScopeError') { _showScopeNudge(); } else throw e; }
+    if (personalSpotify.isConnected()) {
+      if (!personalSpotify.hasPlaylistScope()) {
+        _playlistError('⚠ Spotify needs updated permissions — open the profile button, log out, then reconnect.');
+        return;
+      }
+      const items = await personalSpotify.pagedGet('https://api.spotify.com/v1/me/playlists?limit=50');
+      playlists = items
+        .filter(pl => pl)
+        .map(pl => ({ id: pl.id, name: pl.name, trackCount: pl.tracks?.total || 0, imageUrl: pl.images?.[0]?.url || '' }));
+    } else {
+      playlists = await api.get('/api/all-playlists');
     }
-    if (!playlists) playlists = await api.get('/api/all-playlists');
     allPlaylistsCache = playlists;
     applyAllPlaylistsFilter();
   } catch (e) {
-    dom.playlistSelect.innerHTML = '<option value="">Error loading playlists</option>';
-    dom.setupError.textContent = e.message;
+    _playlistError(e.name === 'ScopeError'
+      ? '⚠ Spotify permission error — open the profile button, log out, then reconnect.'
+      : '⚠ Could not load playlists: ' + e.message);
   }
 }
 
@@ -207,22 +214,26 @@ async function loadSearchPlaylists(q) {
   dom.setupError.textContent = '';
   try {
     let playlists;
-    if (_usePersonalPlaylists()) {
-      try {
-        const data = await personalSpotify.jsonGet(
-          `https://api.spotify.com/v1/search?q=${encodeURIComponent(q)}&type=playlist&limit=50`
-        );
-        playlists = (data?.playlists?.items || [])
-          .filter(pl => pl && pl.id)
-          .map(pl => ({ id: pl.id, name: pl.name, owner: pl.owner?.display_name || '', trackCount: pl.tracks?.total || 0, imageUrl: pl.images?.[0]?.url || '' }));
-      } catch (e) { if (e.name === 'ScopeError') { _showScopeNudge(); } else throw e; }
+    if (personalSpotify.isConnected()) {
+      if (!personalSpotify.hasPlaylistScope()) {
+        _playlistError('⚠ Spotify needs updated permissions — open the profile button, log out, then reconnect.');
+        return;
+      }
+      const data = await personalSpotify.jsonGet(
+        `https://api.spotify.com/v1/search?q=${encodeURIComponent(q)}&type=playlist&limit=50`
+      );
+      playlists = (data?.playlists?.items || [])
+        .filter(pl => pl && pl.id)
+        .map(pl => ({ id: pl.id, name: pl.name, owner: pl.owner?.display_name || '', trackCount: pl.tracks?.total || 0, imageUrl: pl.images?.[0]?.url || '' }));
+    } else {
+      playlists = await api.get('/api/search-playlists?q=' + encodeURIComponent(q));
     }
-    if (!playlists) playlists = await api.get('/api/search-playlists?q=' + encodeURIComponent(q));
     lastSearchResults = playlists;
     setSelectOptions(playlists, true);
   } catch (e) {
-    dom.playlistSelect.innerHTML = '<option value="">Search failed</option>';
-    dom.setupError.textContent = e.message;
+    _playlistError(e.name === 'ScopeError'
+      ? '⚠ Spotify permission error — open the profile button, log out, then reconnect.'
+      : '⚠ Search failed: ' + e.message);
   }
 }
 
@@ -257,7 +268,7 @@ async function updatePlaylistInfo() {
   const seq = ++infoFetchSeq;
   dom.playlistInfo.textContent = 'Loading…';
   try {
-    const tracks = _usePersonalPlaylists()
+    const tracks = personalSpotify.isConnected()
       ? await fetchPersonalTracks(playlistId)
       : await api.tracks(playlistId);
     if (seq !== infoFetchSeq) return;
@@ -417,7 +428,7 @@ async function startGame() {
     const trackArrays = await Promise.all(
       selectedPlaylists.map(async pl => {
         if (tracksCache[pl.id]) return tracksCache[pl.id];
-        const tracks = _usePersonalPlaylists()
+        const tracks = personalSpotify.isConnected()
           ? await fetchPersonalTracks(pl.id)
           : await api.tracks(pl.id);
         tracksCache[pl.id] = tracks;
