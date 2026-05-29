@@ -34,7 +34,7 @@ const api = {
 // If not, playback falls back to the server's account (host/shared screen).
 
 const PKCE_STORAGE_KEY = 'hitster_personal_spotify';
-const PKCE_SCOPE = 'user-read-playback-state user-modify-playback-state';
+const PKCE_SCOPE = 'user-read-playback-state user-modify-playback-state playlist-read-private playlist-read-collaborative';
 
 let _spotifyClientId = null;
 async function getSpotifyClientId() {
@@ -61,6 +61,7 @@ const personalSpotify = {
   refreshToken: null,
   displayName:  null,
   imageUrl:     null,
+  grantedScope: null,   // scopes actually granted by Spotify
 
   load() {
     try {
@@ -69,6 +70,7 @@ const personalSpotify = {
         this.token = d.token; this.expiresAt = d.expiresAt;
         this.refreshToken = d.refreshToken; this.displayName = d.displayName || null;
         this.imageUrl = d.imageUrl || null;
+        this.grantedScope = d.grantedScope || null;
       }
     } catch (_) {}
   },
@@ -77,11 +79,17 @@ const personalSpotify = {
     localStorage.setItem(PKCE_STORAGE_KEY, JSON.stringify({
       token: this.token, expiresAt: this.expiresAt,
       refreshToken: this.refreshToken, displayName: this.displayName,
-      imageUrl: this.imageUrl,
+      imageUrl: this.imageUrl, grantedScope: this.grantedScope,
     }));
   },
 
   isConnected() { return !!(this.token || this.refreshToken); },
+
+  /** Returns true when the stored token includes playlist read scopes. */
+  hasPlaylistScope() {
+    if (!this.grantedScope) return false;
+    return this.grantedScope.includes('playlist-read-private');
+  },
 
   async getToken() {
     if (this.token && this.expiresAt && Date.now() < this.expiresAt - 60000) return this.token;
@@ -132,6 +140,7 @@ const personalSpotify = {
       this.token        = data.access_token;
       this.expiresAt    = Date.now() + data.expires_in * 1000;
       this.refreshToken = data.refresh_token;
+      this.grantedScope = data.scope || PKCE_SCOPE;
       const meRes = await fetch('https://api.spotify.com/v1/me', { headers: { 'Authorization': 'Bearer ' + this.token } });
       const me    = await meRes.json();
       this.displayName = me.display_name || me.id || 'Spotify user';
@@ -143,7 +152,7 @@ const personalSpotify = {
 
   disconnect() {
     this.token = null; this.expiresAt = null; this.refreshToken = null;
-    this.displayName = null; this.imageUrl = null;
+    this.displayName = null; this.imageUrl = null; this.grantedScope = null;
     localStorage.removeItem(PKCE_STORAGE_KEY);
   },
 
@@ -154,10 +163,17 @@ const personalSpotify = {
     return fetch(url, init);
   },
 
-  /** Fetch JSON from a single Spotify URL, returns parsed object or null. */
+  /** Fetch JSON from a single Spotify URL, returns parsed object or null.
+   *  Throws a `ScopeError` on 401/403 so callers can detect scope issues. */
   async jsonGet(url) {
     const res = await this.spotifyFetch(url);
-    if (!res || !res.ok) return null;
+    if (!res) return null;
+    if (res.status === 401 || res.status === 403) {
+      const err = new Error('Insufficient Spotify permissions — please reconnect your account.');
+      err.name = 'ScopeError';
+      throw err;
+    }
+    if (!res.ok) return null;
     return res.json();
   },
 
