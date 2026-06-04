@@ -751,14 +751,150 @@ app.post('/auth/logout', (req, res) => {
   res.json({ ok: true, mode: authMode, oauthLinked: false });
 });
 
+// ─── Multiplayer rooms ────────────────────────────────────────────────────────
+
+const rooms = new Map();   // code → { code, hostSocketId, players, lastSnapshot }
+
+// Lightweight room-info endpoint: player page fetches team names before joining
+app.get('/api/room/:code', (req, res) => {
+  const room = rooms.get(req.params.code.toUpperCase());
+  if (!room) return res.status(404).json({ error: 'Room not found' });
+  const teams = room.lastSnapshot?.teams?.map(t => ({ name: t.name })) || [];
+  res.json({ teams, playerCount: room.players.length });
+});
+
 // ─── Start ────────────────────────────────────────────────────────────────────
 
-// Export for Vercel (serverless — Vercel creates the HTTP server itself)
+const { Server } = require('socket.io');
+const httpServer = http.createServer(app);
+const io = new Server(httpServer, { cors: { origin: '*' } });
+
+// ─── Room code generator ──────────────────────────────────────────────────────
+
+const ROOM_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';  // no ambiguous 0/O/1/I
+
+function generateRoomCode() {
+  let code = '';
+  for (let i = 0; i < 4; i++) code += ROOM_CHARS[Math.floor(Math.random() * ROOM_CHARS.length)];
+  return code;
+}
+
+function uniqueRoomCode() {
+  let code;
+  do { code = generateRoomCode(); } while (rooms.has(code));
+  return code;
+}
+
+// ─── Socket.io room events ────────────────────────────────────────────────────
+
+io.on('connection', (socket) => {
+
+  // Host creates a room
+  socket.on('host:create_room', () => {
+    const code = uniqueRoomCode();
+    rooms.set(code, { code, hostSocketId: socket.id, players: [], lastSnapshot: null });
+    socket.join('room:' + code);
+    socket.emit('room:created', { code });
+    console.log('[room] created', code, 'host=', socket.id);
+  });
+
+  // Player probes a room before joining (to get team names for the join form)
+  socket.on('player:get_room_info', ({ code }) => {
+    const room = rooms.get((code || '').toUpperCase());
+    if (!room) {
+      socket.emit('room:error', { message: 'Room not found. Ask the host to check the code.' });
+      return;
+    }
+    const teams = (room.lastSnapshot?.teams || []).map(t => ({ name: t.name }));
+    socket.emit('room:info', { teams, playerCount: room.players.length });
+  });
+
+  // Player joins a room
+  socket.on('player:join', ({ code, name, teamIndex }) => {
+    const roomCode = (code || '').toUpperCase();
+    const room = rooms.get(roomCode);
+    if (!room) {
+      socket.emit('room:error', { message: 'Room not found: ' + roomCode });
+      return;
+    }
+    // Remove any stale entry for this socket (reconnect scenario)
+    room.players = room.players.filter(p => p.socketId !== socket.id);
+    room.players.push({ socketId: socket.id, name, teamIndex });
+    socket.data = { code: roomCode, name, teamIndex };
+    socket.join('room:' + roomCode);
+    socket.emit('room:join_ok', { players: room.players, snapshot: room.lastSnapshot });
+    io.to('room:' + roomCode).emit('room:players_updated', { players: room.players });
+    console.log('[room]', roomCode, '+player', name, 'team=' + teamIndex);
+  });
+
+  // Player changes team (lobby phase)
+  socket.on('player:change_team', ({ code, teamIndex }) => {
+    const roomCode = (code || '').toUpperCase();
+    const room = rooms.get(roomCode);
+    if (!room) return;
+    const player = room.players.find(p => p.socketId === socket.id);
+    if (player) {
+      player.teamIndex = teamIndex;
+      if (socket.data) socket.data.teamIndex = teamIndex;
+      io.to('room:' + roomCode).emit('room:players_updated', { players: room.players });
+    }
+  });
+
+  // Host pushes game state → forward to all players (not back to host)
+  socket.on('host:state', ({ code, snapshot }) => {
+    const roomCode = (code || '').toUpperCase();
+    const room = rooms.get(roomCode);
+    if (!room || room.hostSocketId !== socket.id) return;
+    room.lastSnapshot = snapshot;
+    socket.to('room:' + roomCode).emit('game:state', { snapshot });
+  });
+
+  // Player selects a slot → forward to host only
+  socket.on('player:select_slot', ({ code, slotIndex }) => {
+    const roomCode = (code || '').toUpperCase();
+    const room = rooms.get(roomCode);
+    if (!room) return;
+    const player     = room.players.find(p => p.socketId === socket.id);
+    const playerName = player?.name      ?? socket.data?.name      ?? 'Unknown';
+    const teamIndex  = player?.teamIndex ?? socket.data?.teamIndex ?? 0;
+    io.to(room.hostSocketId).emit('player:slot_selected', { slotIndex, playerName, teamIndex });
+  });
+
+  // Disconnect cleanup
+  socket.on('disconnect', () => {
+    if (socket.data?.code) {
+      const room = rooms.get(socket.data.code);
+      if (room) {
+        if (room.hostSocketId === socket.id) {
+          socket.to('room:' + room.code).emit('room:host_left');
+          rooms.delete(room.code);
+          console.log('[room] deleted', room.code, '(host disconnected)');
+        } else {
+          room.players = room.players.filter(p => p.socketId !== socket.id);
+          io.to('room:' + room.code).emit('room:players_updated', { players: room.players });
+          console.log('[room]', room.code, '-player', socket.data.name);
+        }
+      }
+    } else {
+      // Host socket may not carry socket.data — scan all rooms
+      for (const [code, room] of rooms) {
+        if (room.hostSocketId === socket.id) {
+          socket.to('room:' + code).emit('room:host_left');
+          rooms.delete(code);
+          console.log('[room] deleted', code, '(host disconnected, no data)');
+          break;
+        }
+      }
+    }
+  });
+});
+
+// Export for Vercel (serverless — Vercel creates the HTTP server itself; no socket.io on Vercel)
 module.exports = app;
 
 // Local development: start the server directly
 if (require.main === module) {
-  http.createServer(app).listen(PORT, () => {
+  httpServer.listen(PORT, () => {
     console.log('Hitster running at http://localhost:' + PORT);
   });
 }

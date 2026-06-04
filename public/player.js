@@ -1,0 +1,325 @@
+'use strict';
+
+// ─── State ────────────────────────────────────────────────────────────────────
+
+const roomCode   = (new URLSearchParams(location.search).get('room') || '').toUpperCase();
+let socket       = null;
+let myName       = '';
+let myTeamIndex  = 0;
+let joined       = false;
+let latestSnap   = null;   // most recent snapshot from host
+let seenReveal   = false;  // true when we've shown a 'revealed' phase
+let caughtUp     = true;   // false = player is on the catch-up screen
+const app        = document.getElementById('app');
+
+// ─── Render helpers ───────────────────────────────────────────────────────────
+
+function h(tag, cls, inner) {
+  return '<' + tag + (cls ? ' class="' + cls + '"' : '') + '>' + (inner || '') + '</' + tag + '>';
+}
+
+function renderScoreChips(snap) {
+  const cur = snap.currentTeamIndex;
+  return snap.teams.map((t, i) =>
+    h('span', 'p-score-chip' + (i === cur ? ' active' : ''),
+      esc(t.name) + ': ' + t.cards.length)
+  ).join('');
+}
+
+function renderTimeline(cards, interactive, selectedSlot) {
+  if (!cards.length && !interactive) {
+    return h('p', 'p-waiting', 'No cards yet');
+  }
+  const slots = cards.length + 1;
+  let row = '';
+  for (let i = 0; i < slots; i++) {
+    if (interactive) {
+      const sel = selectedSlot === i;
+      const label = cards.length === 0 ? 'Here'
+        : i === 0           ? 'Before ' + cards[0].year
+        : i === cards.length ? 'After ' + cards[cards.length - 1].year
+        : 'Between ' + cards[i - 1].year + ' and ' + cards[i].year;
+      row += '<div class="p-slot' + (sel ? ' selected' : '') + '" data-slot="' + i + '">'
+           + '<button class="p-slot-btn" title="' + label + '">+</button></div>';
+    } else {
+      row += '<div class="p-slot"><div class="p-slot-dot"></div></div>';
+    }
+    if (i < cards.length) {
+      const c = cards[i];
+      const color = getDecadeVibe(c.year).color;
+      const yr = (c.yearUncertain ? '~' : '') + c.year;
+      row += '<div class="p-tc">'
+           + '<div class="p-tc-year" style="color:' + color + '">' + yr + '</div>'
+           + '<div class="p-tc-title">' + esc(c.title) + '</div>'
+           + '<div class="p-tc-artist">' + esc(c.artist) + '</div>'
+           + '</div>';
+    }
+  }
+  return '<div class="p-timeline-wrap"><div class="p-timeline-row">' + row + '</div></div>';
+}
+
+// ─── Views ────────────────────────────────────────────────────────────────────
+
+function renderJoinForm(teams) {
+  const teamOpts = teams.length
+    ? teams.map((t, i) => '<option value="' + i + '">' + esc(t.name) + '</option>').join('')
+    : '<option value="0">Team 1</option><option value="1">Team 2</option>';
+
+  app.innerHTML =
+    h('div', 'p-header',
+      h('span', 'p-header-title', '🎵 Hitster') +
+      h('span', 'p-room-code', roomCode)) +
+    h('div', 'p-card',
+      h('div', 'p-form',
+        h('div', '', h('p', 'p-label', 'Your name') +
+          '<input id="p-name" class="p-input" type="text" placeholder="Enter your name…" maxlength="20" autocomplete="off">') +
+        h('div', '', h('p', 'p-label', 'Your team') +
+          '<select id="p-team" class="p-select">' + teamOpts + '</select>') +
+        '<button id="p-join-btn" class="p-btn" disabled>Join Game</button>'));
+
+  const nameEl = document.getElementById('p-name');
+  const teamEl = document.getElementById('p-team');
+  const joinBtn = document.getElementById('p-join-btn');
+
+  nameEl.focus();
+  nameEl.addEventListener('input', () => {
+    joinBtn.disabled = !nameEl.value.trim();
+  });
+  joinBtn.addEventListener('click', () => {
+    myName = nameEl.value.trim();
+    myTeamIndex = parseInt(teamEl.value, 10) || 0;
+    if (!myName) return;
+    joinBtn.disabled = true;
+    joinBtn.textContent = 'Joining…';
+    socket.emit('player:join', { code: roomCode, name: myName, teamIndex: myTeamIndex });
+  });
+  nameEl.addEventListener('keydown', e => { if (e.key === 'Enter') joinBtn.click(); });
+}
+
+function renderLobby(players) {
+  const list = (players || []).map(p =>
+    h('div', 'p-player-row',
+      h('span', 'p-player-name', esc(p.name)) +
+      (latestSnap?.teams?.[p.teamIndex]
+        ? h('span', 'p-player-team', esc(latestSnap.teams[p.teamIndex].name))
+        : ''))
+  ).join('') || h('p', 'p-waiting', 'No other players yet');
+
+  app.innerHTML =
+    h('div', 'p-header',
+      h('span', 'p-header-title', '🎵 Hitster') +
+      h('span', 'p-room-code', roomCode)) +
+    h('div', 'p-card',
+      h('p', 'p-section-title', 'Players in room') +
+      h('div', 'p-player-list', list) +
+      h('p', 'p-status', 'Waiting for the host to start the game…'));
+}
+
+function renderGame(snap) {
+  if (!snap) return;
+  const isMyTurn  = snap.activeTeams.includes(myTeamIndex) &&
+                    snap.currentTeamIndex === myTeamIndex;
+  const myCards   = snap.teams[myTeamIndex]?.cards || [];
+
+  let content = '';
+
+  // Header
+  content += h('div', 'p-header',
+    h('span', 'p-header-title', '🎵 ' + (snap.isTiebreaker ? '⚡ Sudden Death' : esc(snap.playlistName || 'Hitster'))) +
+    h('span', 'p-room-code', roomCode));
+
+  // Scores
+  content += h('div', 'p-card',
+    h('p', 'p-section-title', 'Scores') +
+    h('div', 'p-scores', renderScoreChips(snap)) +
+    h('p', 'p-waiting', snap.deckCount + ' cards left'));
+
+  // Catch-up banner
+  if (!caughtUp) {
+    content += h('div', 'p-catchup', '⏩ The game has moved on — tap Continue below to catch up.');
+  }
+
+  // Phase-specific panel
+  if (snap.phase === 'revealed' || !caughtUp) {
+    content += renderRevealedPanel(snap, isMyTurn);
+  } else if (snap.phase === 'pre-turn') {
+    content += renderPreTurnPanel(snap, isMyTurn, myCards);
+  } else if (snap.phase === 'playing') {
+    content += renderPlayingPanel(snap, isMyTurn, myCards);
+  } else if (snap.phase === 'finished') {
+    content += renderFinishedPanel(snap);
+  }
+
+  app.innerHTML = content;
+  attachSlotListeners(snap, isMyTurn);
+  attachContinueListener(snap);
+}
+
+function renderPreTurnPanel(snap, isMyTurn, myCards) {
+  return h('div', 'p-card',
+    h('p', 'p-section-title', 'Current team') +
+    h('p', 'p-status', isMyTurn
+      ? '🎯 It\'s your team\'s turn! Waiting for the host to start…'
+      : '⏳ ' + esc(snap.currentTeamName) + ' is about to play') +
+    h('p', 'p-section-title', 'Your timeline') +
+    renderTimeline(myCards, false, null));
+}
+
+function renderPlayingPanel(snap, isMyTurn, myCards) {
+  if (isMyTurn) {
+    const sel = snap.selectedSlot;
+    return h('div', 'p-card',
+      h('p', 'p-section-title', 'Place the card on your timeline') +
+      renderTimeline(myCards, true, sel) +
+      (sel !== null
+        ? h('p', 'p-status', '✓ Slot ' + (sel + 1) + ' selected — waiting for host to confirm')
+        : h('p', 'p-waiting', 'Tap a + to place the card')));
+  }
+  return h('div', 'p-card',
+    h('p', 'p-status', '🎵 ' + esc(snap.currentTeamName) + ' is choosing…') +
+    h('p', 'p-section-title', 'Their timeline') +
+    renderTimeline(snap.teams[snap.currentTeamIndex]?.cards || [], false, null) +
+    '<button class="p-steal" disabled title="Coming soon">🔒 Steal (coming soon)</button>');
+}
+
+function renderRevealedPanel(snap, isMyTurn) {
+  const card   = snap.card;
+  const result = snap.result;
+  if (!card) return '';
+  const yr    = (card.yearUncertain ? '~' : '') + card.year;
+  const color = getDecadeVibe(card.year).color;
+  let html = h('div', 'p-card',
+    h('div', 'p-card-reveal',
+      (card.albumArt ? '<img class="p-card-art" src="' + esc(card.albumArt) + '" alt="">' : '') +
+      h('div', 'p-card-year', yr) +
+      h('div', 'p-card-title', esc(card.title)) +
+      h('div', 'p-card-artist', esc(card.artist))));
+  if (result) {
+    html += h('div', 'p-result ' + (result.correct ? 'correct' : 'wrong'), esc(result.text));
+  }
+  html += '<button id="p-continue-btn" class="p-btn" style="margin-top:4px">Continue →</button>';
+  return html;
+}
+
+function renderFinishedPanel(snap) {
+  if (!snap.winnerIndices) return '';
+  const winners = snap.winnerIndices.map(i => snap.teams[i].name);
+  return h('div', 'p-card',
+    h('h2', '', '🏆 ' + esc(winners.join(' & ')) + (winners.length > 1 ? ' tie!' : ' wins!')) +
+    h('div', 'p-scores', renderScoreChips(snap)) +
+    '<button class="p-btn p-btn-ghost" onclick="location.href=\'\/\'" style="margin-top:12px">Back to home</button>');
+}
+
+function renderError(msg) {
+  app.innerHTML =
+    h('div', 'p-header', h('span', 'p-header-title', '🎵 Hitster')) +
+    h('div', 'p-error', esc(msg)) +
+    '<button class="p-btn p-btn-ghost" onclick="location.href=\'/\'" style="margin-top:12px">Go home</button>';
+}
+
+// ─── Event wiring ─────────────────────────────────────────────────────────────
+
+function attachSlotListeners(snap, isMyTurn) {
+  if (!isMyTurn || snap.phase !== 'playing' || snap.selectedSlot !== null) return;
+  document.querySelectorAll('.p-slot').forEach(el => {
+    el.addEventListener('click', () => {
+      const idx = parseInt(el.dataset.slot, 10);
+      socket.emit('player:select_slot', { code: roomCode, slotIndex: idx });
+    });
+  });
+}
+
+function attachContinueListener(snap) {
+  const btn = document.getElementById('p-continue-btn');
+  if (!btn) return;
+  btn.addEventListener('click', () => {
+    caughtUp = true;
+    seenReveal = false;
+    renderGame(latestSnap);
+  });
+}
+
+// ─── Socket setup ─────────────────────────────────────────────────────────────
+
+function initSocket() {
+  socket = io();
+
+  socket.on('connect', () => {
+    if (!roomCode) { renderError('No room code in URL. Scan the QR code again.'); return; }
+    socket.emit('player:get_room_info', { code: roomCode });
+  });
+
+  socket.on('room:info', ({ teams }) => {
+    if (!joined) renderJoinForm(teams);
+  });
+
+  socket.on('room:error', ({ message }) => {
+    renderError(message);
+  });
+
+  socket.on('room:join_ok', ({ players, snapshot }) => {
+    joined = true;
+    latestSnap = snapshot;
+    if (snapshot && snapshot.phase && snapshot.phase !== 'pre-turn') {
+      caughtUp = false;
+      renderGame(snapshot);
+    } else {
+      renderLobby(players);
+    }
+  });
+
+  socket.on('room:players_updated', ({ players }) => {
+    if (!joined) return;
+    if (!latestSnap || latestSnap.phase === 'pre-turn') {
+      renderLobby(players);
+    }
+  });
+
+  socket.on('game:state', ({ snapshot }) => {
+    if (!joined) return;
+    const prev = latestSnap;
+    latestSnap = snapshot;
+
+    // If the new snapshot is 'revealed' and we haven't shown it yet → show it
+    if (snapshot.phase === 'revealed' && (!prev || prev.phase !== 'revealed')) {
+      seenReveal = true;
+      caughtUp = true;   // always show the reveal immediately
+    }
+
+    // If we haven't caught up to a previous reveal, stay on catch-up view
+    if (!caughtUp && snapshot.phase !== 'revealed') {
+      renderGame(snapshot);  // keeps catch-up banner, updates scores
+      return;
+    }
+
+    renderGame(snapshot);
+  });
+
+  socket.on('room:host_left', () => {
+    renderError('The host has disconnected. The game has ended.');
+  });
+
+  socket.on('connect_error', () => {
+    if (!joined) {
+      app.innerHTML = h('div', 'p-connecting',
+        'Could not connect to the game server. Make sure you\'re on the same network as the host.');
+    }
+  });
+
+  socket.on('disconnect', () => {
+    if (joined) {
+      const banner = document.createElement('div');
+      banner.className = 'p-catchup';
+      banner.textContent = '⚠ Reconnecting…';
+      app.prepend(banner);
+    }
+  });
+}
+
+// ─── Boot ─────────────────────────────────────────────────────────────────────
+
+if (!roomCode) {
+  renderError('No room code found. Please scan the QR code again.');
+} else {
+  initSocket();
+}

@@ -11,6 +11,9 @@ const dom = {
   scoreChips:         $('score-chips'),
   gamePlaylistInfo:   $('game-playlist-info'),
   tbBadge:            $('tb-badge'),
+  roomPanel:          $('room-panel'),
+  roomCode:           $('room-code'),
+  playerCount:        $('player-count'),
   matchPointBanner:   $('match-point-banner'),
   hardModeBadge:      $('hard-mode-badge'),
   // Game settings overlay
@@ -129,6 +132,11 @@ const state = {
   _hardModePending: false,
   _hardModeDisablePending: false,
 };
+
+// ─── Multiplayer state ────────────────────────────────────────────────────────
+
+let _roomCode = null;
+let _io = null;
 
 // ─── Playback error helpers ───────────────────────────────────────────────────
 
@@ -382,6 +390,61 @@ function applyGameSettings() {
   renderScoreChips();
 }
 
+// ─── Multiplayer helpers ──────────────────────────────────────────────────────
+
+function buildSnapshot() {
+  const team = currentTeam();
+  return {
+    phase:            state.phase,
+    currentTeamIndex: currentTeamIndex(),
+    currentTeamName:  team.name,
+    teams: state.teams.map((t, i) => ({
+      name:     t.name,
+      cards:    t.cards.map(c => ({
+        year:        c.year,
+        yearUncertain: !!c.yearUncertain,
+        title:       c.title,
+        artist:      c.artist,
+      })),
+      isActive: state.activeTeams.includes(i),
+    })),
+    activeTeams:  state.activeTeams,
+    cardsToWin:   state.cardsToWin,
+    deckCount:    state.deck.length,
+    isTiebreaker: state.isTiebreaker,
+    selectedSlot: state.selectedSlot,
+    card: state.currentCard ? {
+      year:         state.currentCard.year,
+      yearUncertain: !!state.currentCard.yearUncertain,
+      title:        state.currentCard.title,
+      artist:       state.currentCard.artist,
+      albumArt:     state.currentCard.albumArt || '',
+    } : null,
+    result:        null,
+    playlistName:  dom.gamePlaylistInfo.textContent,
+    winnerIndices: null,
+  };
+}
+
+function emitState(override) {
+  if (!_io || !_roomCode) return;
+  try {
+    const snapshot = Object.assign(buildSnapshot(), override || {});
+    _io.emit('host:state', { code: _roomCode, snapshot });
+  } catch (_) {}
+}
+
+function _showRoomPanel(code) {
+  if (!dom.roomPanel || !dom.roomCode) return;
+  dom.roomCode.textContent = code;
+  dom.roomPanel.classList.remove('hidden');
+}
+
+function _updatePlayerCount(n) {
+  if (!dom.playerCount) return;
+  dom.playerCount.textContent = n + (n === 1 ? ' player' : ' players');
+}
+
 // ─── Phase transitions ────────────────────────────────────────────────────────
 
 function enterPreTurn() {
@@ -456,6 +519,7 @@ function enterPreTurn() {
   dom.btnDiscard.classList.add('hidden');
   dom.discardConfirm.classList.add('hidden');
   dom.btnNextTeam.classList.add('hidden');
+  emitState();
 }
 
 async function beginTurn() {
@@ -495,6 +559,7 @@ async function beginTurn() {
     dom.btnPauseResume.textContent = '⏸ Pause';
     hidePlaybackError();
     startProgress(card.duration);
+    emitState();
   } catch (e) {
     state.isPlaying = false;
     dom.btnPauseResume.textContent = '▶ Resume';
@@ -507,6 +572,7 @@ function selectSlot(index) {
   state.selectedSlot = index;
   renderTimeline(true);
   dom.btnConfirm.classList.remove('hidden');
+  emitState();
 }
 
 async function confirmPlacement() {
@@ -609,6 +675,7 @@ function finishPlacement(correct, slot, fromHardMode = false) {
     }
   }
 
+  emitState({ result: { correct, text: dom.resultText.textContent } });
   renderTimeline(false);
   renderCurrentTeamBar();
   renderOtherTeams();
@@ -832,6 +899,7 @@ function slotLabel(cards, i) {
 
 function showWinnerScreen(winnerIndices) {
   state.phase = 'finished';
+  emitState({ winnerIndices });
   sessionStorage.setItem('hitster_winner', JSON.stringify({
     teams:         state.teams,
     winnerIndices,
@@ -1141,6 +1209,34 @@ dom.progressBarWrap.addEventListener('click', async (e) => {
 
   personalSpotify.load();
   setOAuthRetryAction(() => { location.href = '/'; });
+
+  // Multiplayer — optional; game works standalone if socket.io is unavailable
+  try {
+    _io = io();
+
+    _io.on('connect', () => {
+      _io.emit('host:create_room');
+    });
+
+    _io.on('room:created', ({ code }) => {
+      _roomCode = code;
+      _showRoomPanel(code);
+    });
+
+    _io.on('room:players_updated', ({ players }) => {
+      _updatePlayerCount(players.length);
+    });
+
+    _io.on('player:slot_selected', ({ slotIndex }) => {
+      if (state.phase === 'playing') selectSlot(slotIndex);
+    });
+
+    _io.on('connect_error', () => {
+      // Silent — multiplayer just won't work
+    });
+  } catch (_) {
+    // socket.io not available (e.g. Vercel) — standalone mode
+  }
 
   syncHardModeCtl();
   showStartingCards();

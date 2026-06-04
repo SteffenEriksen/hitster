@@ -19,6 +19,18 @@
       <div class="game-header-center">
         <span id="deck-counter" class="deck-counter">0 cards left</span>
         <span id="tb-badge" class="tb-badge hidden">⚡ SUDDEN DEATH</span>
+        <div id="room-panel" class="room-panel hidden">
+          <span id="room-code" class="room-code"></span>
+          <span id="player-count" class="player-count">0 players</span>
+        </div>
+        <div id="qr-overlay" class="qr-overlay hidden">
+          <div class="qr-card">
+            <p class="qr-title">Scan to join</p>
+            <canvas id="qr-canvas"></canvas>
+            <p id="qr-url" class="qr-url"></p>
+            <button id="btn-qr-close" class="btn-ghost btn-sm">Close</button>
+          </div>
+        </div>
         <div class="game-settings-ctl">
           <button id="btn-game-settings" class="btn-game-settings">⚙ Settings</button>
           <span id="hard-mode-badge" class="hard-mode-badge hidden"></span>
@@ -250,6 +262,8 @@
     </div>
   </div>
 
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
   <script src="common.js"></script>
   <script src="game.js"></script>
 </body>

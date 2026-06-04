@@ -2237,3 +2237,15 @@ button { cursor: pointer; font-family: inherit; border: none; outline: none; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--grey-100); border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--grey-300); }
+
+/* ─── Room panel ──────────────────────────────────────────────────────────── */
+.room-panel { display: flex; align-items: center; gap: 6px; }
+.room-code { font-size: 0.75rem; font-weight: 800; color: rgba(255,255,255,0.9); background: rgba(255,255,255,0.15); border-radius: 20px; padding: 3px 10px; letter-spacing: 0.08em; cursor: pointer; }
+.room-code:hover { background: rgba(255,255,255,0.25); }
+.player-count { font-size: 0.65rem; color: rgba(255,255,255,0.6); }
+
+/* ─── QR overlay ──────────────────────────────────────────────────────────── */
+.qr-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.7); display: flex; align-items: center; justify-content: center; z-index: 300; }
+.qr-card { background: #fff; border-radius: 16px; padding: 24px; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.qr-title { font-weight: 700; font-size: 1rem; color: #111; margin: 0; }
+.qr-url { font-size: 0.7rem; color: #666; word-break: break-all; max-width: 220px; margin: 0; }
