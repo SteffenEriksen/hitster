@@ -404,6 +404,25 @@ function initTeamInputs() {
 async function startGame() {
   dom.setupError.textContent   = '';
   dom.btnStartGame.disabled    = true;
+  dom.btnStartGame.textContent = 'Checking Spotify…';
+
+  // Verify the Spotify token is still alive before we navigate away
+  try {
+    const token = await personalSpotify.getToken();
+    if (!token) {
+      dom.setupError.textContent   = '⚠ Spotify connection lost. Reconnect via the profile button then try again.';
+      dom.btnStartGame.disabled    = false;
+      dom.btnStartGame.textContent = 'Start Game';
+      renderInfoPanel();  // refresh the info panel to show Not Connected
+      return;
+    }
+  } catch (_) {
+    dom.setupError.textContent   = '⚠ Could not reach Spotify. Check your connection and try again.';
+    dom.btnStartGame.disabled    = false;
+    dom.btnStartGame.textContent = 'Start Game';
+    return;
+  }
+
   dom.btnStartGame.textContent = 'Loading tracks…';
 
   try {

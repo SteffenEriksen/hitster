@@ -1260,6 +1260,37 @@ dom.progressBarWrap.addEventListener('click', async (e) => {
     // socket.io not available (e.g. Vercel) — standalone mode
   }
 
+  // Verify Spotify token is still valid — the same token from the setup page
+  // but it may have expired if the user was on setup for a long time
+  try {
+    const token = await personalSpotify.getToken();
+    if (!token) {
+      _showSpotifyExpiredOverlay();
+      return;
+    }
+  } catch (_) {
+    _showSpotifyExpiredOverlay();
+    return;
+  }
+
   syncHardModeCtl();
   showStartingCards();
 })();
+
+function _showSpotifyExpiredOverlay() {
+  const overlay = document.createElement('div');
+  overlay.style.cssText =
+    'position:fixed;inset:0;background:rgba(0,0,0,0.8);display:flex;' +
+    'align-items:center;justify-content:center;z-index:500;padding:24px';
+  overlay.innerHTML =
+    '<div style="background:#fff;border-radius:20px;padding:36px 28px;max-width:360px;' +
+    'width:100%;text-align:center;display:flex;flex-direction:column;gap:14px">' +
+    '<div style="font-size:2rem">🎵</div>' +
+    '<h2 style="font-size:1.15rem;font-weight:800;margin:0">Spotify connection expired</h2>' +
+    '<p style="color:#6b7280;font-size:0.9rem;margin:0">Please go back to the setup page and reconnect your Spotify account before starting a game.</p>' +
+    '<button onclick="sessionStorage.removeItem(\'hitster_game\');location.href=\'/\'" ' +
+    'style="background:#007272;color:#fff;border:none;border-radius:50px;padding:14px;' +
+    'font-size:1rem;font-weight:700;cursor:pointer;font-family:inherit">← Back to Setup</button>' +
+    '</div>';
+  document.body.appendChild(overlay);
+}
