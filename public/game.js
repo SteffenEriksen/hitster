@@ -450,14 +450,18 @@ function _updatePlayerCount(n) {
 dom.roomCode?.addEventListener('click', () => {
   if (!_roomCode) return;
   const overlay = $('qr-overlay');
-  const canvas  = $('qr-canvas');
+  const img     = $('qr-img');
   const urlEl   = $('qr-url');
-  if (!overlay || !canvas) return;
+  if (!overlay) return;
   const joinUrl = location.origin + '/player?room=' + _roomCode;
   if (urlEl) urlEl.textContent = joinUrl;
-  try {
-    QRCode.toCanvas(canvas, joinUrl, { width: 200, margin: 2 }, () => {});
-  } catch (_) {}
+  if (img) {
+    try {
+      QRCode.toDataURL(joinUrl, { width: 220, margin: 2 }, (err, dataUrl) => {
+        if (!err) img.src = dataUrl;
+      });
+    } catch (_) {}
+  }
   overlay.classList.remove('hidden');
 });
 
