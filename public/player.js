@@ -205,7 +205,7 @@ function renderRevealedPanel(snap, isMyTurn) {
   if (isNextTeam) {
     html +=
       h('div', 'p-next-banner', '🎯 Your team is up next!') +
-      '<button id="p-next-team-btn" class="p-btn" style="margin-top:4px">▶ Start Our Turn</button>';
+      '<button id="p-next-team-btn" class="p-btn" style="margin-top:4px">▶ Start Our Turn &amp; Play</button>';
   } else {
     html += '<button id="p-continue-btn" class="p-btn" style="margin-top:4px">Continue →</button>';
   }

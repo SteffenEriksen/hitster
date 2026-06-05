@@ -1256,7 +1256,10 @@ dom.progressBarWrap.addEventListener('click', async (e) => {
     });
 
     _io.on('player:next_team', () => {
-      if (state.phase === 'revealed') nextTeam();
+      if (state.phase !== 'revealed') return;
+      nextTeam();
+      // If nextTeam() landed in pre-turn (not sudden-death or game-over), start immediately
+      if (state.phase === 'pre-turn') beginTurn();
     });
 
     _io.on('connect_error', () => {
