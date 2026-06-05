@@ -17,6 +17,11 @@ const SPOTIFY_CONFIG_PATH = process.env.SPOTIFY_CONFIG_PATH ||
 
 const app = express();
 app.use(express.static(path.join(__dirname, 'public')));
+
+// Serve the player page at /player (query string ?room=CODE is handled client-side)
+app.get('/player', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'player.html'));
+});
 app.use(express.json());
 
 // ─── Auth mode state ──────────────────────────────────────────────────────────
