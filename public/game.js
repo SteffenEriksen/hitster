@@ -455,13 +455,7 @@ dom.roomCode?.addEventListener('click', () => {
   if (!overlay) return;
   const joinUrl = location.origin + '/player?room=' + _roomCode;
   if (urlEl) urlEl.textContent = joinUrl;
-  if (img) {
-    try {
-      QRCode.toDataURL(joinUrl, { width: 220, margin: 2 }, (err, dataUrl) => {
-        if (!err) img.src = dataUrl;
-      });
-    } catch (_) {}
-  }
+  if (img) img.src = 'https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=' + encodeURIComponent(joinUrl);
   overlay.classList.remove('hidden');
 });
 
