@@ -896,5 +896,7 @@ module.exports = app;
 if (require.main === module) {
   httpServer.listen(PORT, () => {
     console.log('Hitster running at http://localhost:' + PORT);
+    const creds = getClientCredentials();
+    console.log('Spotify credentials:', creds ? '✓ found (clientId=' + creds.clientId.slice(0,8) + '…)' : '✗ MISSING — set SPOTIFY_CLIENT_ID and SPOTIFY_CLIENT_SECRET');
   });
 }
