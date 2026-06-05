@@ -445,6 +445,26 @@ function _updatePlayerCount(n) {
   dom.playerCount.textContent = n + (n === 1 ? ' player' : ' players');
 }
 
+// ─── QR code overlay ──────────────────────────────────────────────────────────
+
+dom.roomCode?.addEventListener('click', () => {
+  if (!_roomCode) return;
+  const overlay = $('qr-overlay');
+  const canvas  = $('qr-canvas');
+  const urlEl   = $('qr-url');
+  if (!overlay || !canvas) return;
+  const joinUrl = location.origin + '/player?room=' + _roomCode;
+  if (urlEl) urlEl.textContent = joinUrl;
+  try {
+    QRCode.toCanvas(canvas, joinUrl, { width: 200, margin: 2 }, () => {});
+  } catch (_) {}
+  overlay.classList.remove('hidden');
+});
+
+$('btn-qr-close')?.addEventListener('click', () => {
+  $('qr-overlay')?.classList.add('hidden');
+});
+
 // ─── Phase transitions ────────────────────────────────────────────────────────
 
 function enterPreTurn() {
