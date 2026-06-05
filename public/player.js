@@ -153,6 +153,7 @@ function renderGame(snap) {
   app.innerHTML = content;
   attachSlotListeners(snap, isMyTurn);
   attachConfirmListener();
+  attachNextTeamListener();
   attachContinueListener(snap);
 }
 
@@ -199,7 +200,15 @@ function renderRevealedPanel(snap, isMyTurn) {
   if (result) {
     html += h('div', 'p-result ' + (result.correct ? 'correct' : 'wrong'), esc(result.text));
   }
-  html += '<button id="p-continue-btn" class="p-btn" style="margin-top:4px">Continue →</button>';
+
+  const isNextTeam = snap.nextTeamIndex === myTeamIndex;
+  if (isNextTeam) {
+    html +=
+      h('div', 'p-next-banner', '🎯 Your team is up next!') +
+      '<button id="p-next-team-btn" class="p-btn" style="margin-top:4px">▶ Start Our Turn</button>';
+  } else {
+    html += '<button id="p-continue-btn" class="p-btn" style="margin-top:4px">Continue →</button>';
+  }
   return html;
 }
 
@@ -238,6 +247,18 @@ function attachConfirmListener() {
     btn.disabled = true;
     btn.textContent = 'Confirming…';
     socket.emit('player:confirm_placement', { code: roomCode });
+  });
+}
+
+function attachNextTeamListener() {
+  const btn = document.getElementById('p-next-team-btn');
+  if (!btn) return;
+  btn.addEventListener('click', () => {
+    btn.disabled = true;
+    btn.textContent = 'Starting…';
+    caughtUp = true;
+    seenReveal = false;
+    socket.emit('player:next_team', { code: roomCode });
   });
 }
 

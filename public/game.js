@@ -393,11 +393,13 @@ function applyGameSettings() {
 // ─── Multiplayer helpers ──────────────────────────────────────────────────────
 
 function buildSnapshot() {
-  const team = currentTeam();
+  const team       = currentTeam();
+  const nextCursor = (state.activeCursor + 1) % state.activeTeams.length;
   return {
     phase:            state.phase,
     currentTeamIndex: currentTeamIndex(),
     currentTeamName:  team.name,
+    nextTeamIndex:    state.activeTeams[nextCursor],   // who plays after this turn
     teams: state.teams.map((t, i) => ({
       name:     t.name,
       cards:    t.cards.map(c => ({
@@ -1251,6 +1253,10 @@ dom.progressBarWrap.addEventListener('click', async (e) => {
 
     _io.on('player:confirm_placement', () => {
       if (state.phase === 'playing' && state.selectedSlot !== null) confirmPlacement();
+    });
+
+    _io.on('player:next_team', () => {
+      if (state.phase === 'revealed') nextTeam();
     });
 
     _io.on('connect_error', () => {

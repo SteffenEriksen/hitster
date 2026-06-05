@@ -871,6 +871,12 @@ io.on('connection', (socket) => {
     io.to(room.hostSocketId).emit('player:confirm_placement');
   });
 
+  socket.on('player:next_team', ({ code }) => {
+    const room = rooms.get((code || '').toUpperCase());
+    if (!room) return;
+    io.to(room.hostSocketId).emit('player:next_team');
+  });
+
   // Disconnect cleanup
   socket.on('disconnect', () => {
     if (socket.data?.code) {
