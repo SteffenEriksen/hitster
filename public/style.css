@@ -824,6 +824,27 @@ button { cursor: pointer; font-family: inherit; border: none; outline: none; }
   box-shadow: 0 0 0 3px rgba(0,114,114,0.12);
 }
 
+/* Theme picker */
+.theme-picker {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.theme-swatch {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  border: 3px solid transparent;
+  cursor: pointer;
+  transition: transform 0.12s, box-shadow 0.12s;
+  padding: 0;
+  flex-shrink: 0;
+}
+.theme-swatch:hover { transform: scale(1.12); }
+.theme-swatch.active {
+  box-shadow: 0 0 0 2px #fff, 0 0 0 4px var(--grey-700, #374151);
+}
+
 /* Toggle switch */
 .toggle-row {
   display: flex;

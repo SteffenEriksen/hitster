@@ -417,6 +417,19 @@ async function fetchPersonalTracks(playlistId) {
     .filter(t => t && t.year);
 }
 
+// ─── Theme ────────────────────────────────────────────────────────────────────
+
+function setTheme(name) {
+  const el = document.documentElement;
+  [...el.classList].filter(c => c.startsWith('theme-')).forEach(c => el.classList.remove(c));
+  if (name) {
+    el.classList.add('theme-' + name);
+    localStorage.setItem('hitster_theme', 'theme-' + name);
+  } else {
+    localStorage.removeItem('hitster_theme');
+  }
+}
+
 // ─── Utilities ────────────────────────────────────────────────────────────────
 
 function shuffle(arr) {

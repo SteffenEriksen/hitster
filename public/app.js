@@ -645,6 +645,28 @@ function renderProfileButton() {
   if (btnConnect) btnConnect.addEventListener('click', () => personalSpotify.login());
 }
 
+// ─── Theme picker ────────────────────────────────────────────────────────────
+
+(function initThemePicker() {
+  const picker = document.getElementById('theme-picker');
+  if (!picker) return;
+  // Mark the current theme active
+  const current = (localStorage.getItem('hitster_theme') || '').replace('theme-', '');
+  picker.querySelectorAll('.theme-swatch').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.theme === current);
+  });
+  // Switch on click
+  picker.addEventListener('click', e => {
+    const btn = e.target.closest('.theme-swatch');
+    if (!btn) return;
+    const theme = btn.dataset.theme;
+    setTheme(theme);
+    picker.querySelectorAll('.theme-swatch').forEach(b => {
+      b.classList.toggle('active', b.dataset.theme === theme);
+    });
+  });
+})();
+
 // ─── Boot ─────────────────────────────────────────────────────────────────────
 
 function showConnectModal(errorMsg) {

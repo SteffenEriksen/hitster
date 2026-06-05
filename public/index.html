@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Hitster</title>
   <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="themes.css">
+  <script>(function(){var t=localStorage.getItem('hitster_theme');if(t)document.documentElement.classList.add(t);})();</script>
 </head>
 <body>
 
@@ -106,6 +108,19 @@
             <span class="toggle-desc">Must name title &amp; artist on every placement</span>
           </div>
         </label>
+      </section>
+
+      <!-- Theme picker -->
+      <section class="setup-section">
+        <h2>Theme</h2>
+        <div class="theme-picker" id="theme-picker">
+          <button class="theme-swatch active" data-theme=""        title="Teal (default)" style="background:#007272"></button>
+          <button class="theme-swatch"        data-theme="midnight" title="Midnight"       style="background:#6366f1"></button>
+          <button class="theme-swatch"        data-theme="sunset"   title="Sunset"         style="background:#c2410c"></button>
+          <button class="theme-swatch"        data-theme="ocean"    title="Ocean"           style="background:#0369a1"></button>
+          <button class="theme-swatch"        data-theme="rose"     title="Rose"            style="background:#be185d"></button>
+          <button class="theme-swatch"        data-theme="emerald"  title="Emerald"         style="background:#059669"></button>
+        </div>
       </section>
 
       <!-- Start -->

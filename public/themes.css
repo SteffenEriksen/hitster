@@ -1,0 +1,44 @@
+/* ─── Hitster colour themes ───────────────────────────────────────────────────
+   Apply by adding a class to <html>: class="theme-midnight" etc.
+   Default (teal) needs no class — values are in :root in style.css.
+─────────────────────────────────────────────────────────────────────────────── */
+
+/* Midnight — deep indigo/purple */
+html.theme-midnight {
+  --green:      #6366f1;
+  --green-dark: #1e1b4b;
+  --green-light:#818cf8;
+  --green-pale: #ede9fe;
+}
+
+/* Sunset — warm amber/orange */
+html.theme-sunset {
+  --green:      #c2410c;
+  --green-dark: #7c2d12;
+  --green-light:#f97316;
+  --green-pale: #fff7ed;
+}
+
+/* Ocean — sky blue */
+html.theme-ocean {
+  --green:      #0369a1;
+  --green-dark: #0c4a6e;
+  --green-light:#38bdf8;
+  --green-pale: #e0f2fe;
+}
+
+/* Rose — pink/magenta */
+html.theme-rose {
+  --green:      #be185d;
+  --green-dark: #831843;
+  --green-light:#f472b6;
+  --green-pale: #fce7f3;
+}
+
+/* Emerald — fresh deep green */
+html.theme-emerald {
+  --green:      #059669;
+  --green-dark: #064e3b;
+  --green-light:#34d399;
+  --green-pale: #d1fae5;
+}
