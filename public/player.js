@@ -152,6 +152,7 @@ function renderGame(snap) {
 
   app.innerHTML = content;
   attachSlotListeners(snap, isMyTurn);
+  attachConfirmListener();
   attachContinueListener(snap);
 }
 
@@ -172,7 +173,8 @@ function renderPlayingPanel(snap, isMyTurn, myCards) {
       h('p', 'p-section-title', 'Place the card on your timeline') +
       renderTimeline(myCards, true, sel) +
       (sel !== null
-        ? h('p', 'p-status', '✓ Slot ' + (sel + 1) + ' selected — waiting for host to confirm')
+        ? h('p', 'p-status', '✓ Slot ' + (sel + 1) + ' selected') +
+          '<button id="p-confirm-btn" class="p-btn">✓ Confirm Placement</button>'
         : h('p', 'p-waiting', 'Tap a + to place the card')));
   }
   return h('div', 'p-card',
@@ -220,12 +222,22 @@ function renderError(msg) {
 // ─── Event wiring ─────────────────────────────────────────────────────────────
 
 function attachSlotListeners(snap, isMyTurn) {
-  if (!isMyTurn || snap.phase !== 'playing' || snap.selectedSlot !== null) return;
+  if (!isMyTurn || snap.phase !== 'playing') return;
   document.querySelectorAll('.p-slot').forEach(el => {
     el.addEventListener('click', () => {
       const idx = parseInt(el.dataset.slot, 10);
       socket.emit('player:select_slot', { code: roomCode, slotIndex: idx });
     });
+  });
+}
+
+function attachConfirmListener() {
+  const btn = document.getElementById('p-confirm-btn');
+  if (!btn) return;
+  btn.addEventListener('click', () => {
+    btn.disabled = true;
+    btn.textContent = 'Confirming…';
+    socket.emit('player:confirm_placement', { code: roomCode });
   });
 }
 

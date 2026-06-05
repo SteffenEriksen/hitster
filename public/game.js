@@ -1249,6 +1249,10 @@ dom.progressBarWrap.addEventListener('click', async (e) => {
       if (state.phase === 'playing') selectSlot(slotIndex);
     });
 
+    _io.on('player:confirm_placement', () => {
+      if (state.phase === 'playing' && state.selectedSlot !== null) confirmPlacement();
+    });
+
     _io.on('connect_error', () => {
       // Silent — multiplayer just won't work
     });

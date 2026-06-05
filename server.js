@@ -865,6 +865,12 @@ io.on('connection', (socket) => {
     io.to(room.hostSocketId).emit('player:slot_selected', { slotIndex, playerName, teamIndex });
   });
 
+  socket.on('player:confirm_placement', ({ code }) => {
+    const room = rooms.get((code || '').toUpperCase());
+    if (!room) return;
+    io.to(room.hostSocketId).emit('player:confirm_placement');
+  });
+
   // Disconnect cleanup
   socket.on('disconnect', () => {
     if (socket.data?.code) {
