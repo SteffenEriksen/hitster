@@ -6,14 +6,12 @@ const api = {
   async get(path) {
     const res = await fetch(path);
     const json = await res.json();
-    if (res.status === 401 && json.code === 'oauth_required') { handleOAuthRequired(); throw new Error('oauth_required'); }
     if (!res.ok) throw new Error(json.error || res.statusText);
     return json;
   },
   async post(path, body = {}) {
     const res = await fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
     const json = await res.json();
-    if (res.status === 401 && json.code === 'oauth_required') { handleOAuthRequired(); throw new Error('oauth_required'); }
     if (!res.ok) throw new Error(json.error || res.statusText);
     return json;
   },

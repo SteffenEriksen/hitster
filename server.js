@@ -368,7 +368,10 @@ app.use('/api', (req, res, next) => {
 // ─── OAuth required guard ─────────────────────────────────────────────────────
 // Block API calls when OAuth mode is active but no session exists AND
 // no env-var fallback is configured.
+// Exempt: /api/resolve-year-mb (calls MusicBrainz, not Spotify)
+//         /api/room/:code      (room info for multiplayer join page)
 app.use('/api', (req, res, next) => {
+  if (req.path.startsWith('/resolve-year-mb') || req.path.startsWith('/room/')) return next();
   if (authMode === 'oauth' && !oauthSession.accessToken && !hasEnvAuth()) {
     return res.status(401).json({ error: 'Spotify login required', code: 'oauth_required' });
   }
