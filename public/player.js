@@ -227,15 +227,33 @@ function renderRevealedPanel(snap, isMyTurn) {
   const color   = getDecadeVibe(card.year).color;
   const isWrong = result && !result.correct;
 
-  let html = h('div', 'p-card' + (isWrong ? ' p-card--wrong' : ''),
+  let html = '';
+
+  // Prominent result block at the TOP — hard to miss
+  if (result) {
+    if (isWrong) {
+      html +=
+        '<div class="p-verdict p-verdict--wrong">' +
+          '<div class="p-verdict-icon">✗</div>' +
+          '<div class="p-verdict-text">Wrong!</div>' +
+          '<div class="p-verdict-sub">' + esc(result.text.replace('✗ Wrong! ', '')) + '</div>' +
+        '</div>';
+    } else {
+      html +=
+        '<div class="p-verdict p-verdict--correct">' +
+          '<div class="p-verdict-icon">✓</div>' +
+          '<div class="p-verdict-text">Correct!</div>' +
+        '</div>';
+    }
+  }
+
+  // Card details
+  html += h('div', 'p-card' + (isWrong ? ' p-card--wrong' : ''),
     h('div', 'p-card-reveal',
       (card.albumArt ? '<img class="p-card-art" src="' + esc(card.albumArt) + '" alt="">' : '') +
       h('div', 'p-card-year', yr) +
       h('div', 'p-card-title', esc(card.title)) +
       h('div', 'p-card-artist', esc(card.artist))));
-  if (result) {
-    html += h('div', 'p-result ' + (result.correct ? 'correct' : 'wrong'), esc(result.text));
-  }
 
   const isNextTeam = snap.nextTeamIndex === myTeamIndex;
   if (isNextTeam) {

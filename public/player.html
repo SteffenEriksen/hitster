@@ -64,17 +64,39 @@
     .p-card-title { font-size: 1.1rem; font-weight: 700; color: var(--grey-900); }
     .p-card-artist { font-size: 0.88rem; color: var(--grey-500); }
 
-    /* Result banner */
-    .p-result { padding: 12px 16px; border-radius: 0; font-weight: 700; text-align: center; font-size: 0.95rem; }
-    .p-result.correct { background: #dcfce7; color: #166534; }
-    .p-result.wrong   { background: #dc2626; color: #fff; font-size: 1rem; letter-spacing: 0.01em; }
-
-    /* Wrong card — red border + shadow */
-    .p-card--wrong {
-      border: 2px solid #dc2626 !important;
-      background: #fff5f5 !important;
-      box-shadow: 0 0 0 4px rgba(220, 38, 38, 0.15), 0 4px 16px rgba(220, 38, 38, 0.2);
+    /* Result verdict block */
+    .p-verdict { padding: 20px 16px; text-align: center; }
+    .p-verdict--wrong {
+      background: #dc2626;
+      animation: verdict-shake 0.45s ease-in-out;
     }
+    .p-verdict--correct { background: #16a34a; }
+    @keyframes verdict-shake {
+      0%,100% { transform: translateX(0); }
+      15%,45%,75% { transform: translateX(-6px); }
+      30%,60%,90% { transform: translateX(6px); }
+    }
+    .p-verdict-icon {
+      font-size: 2.8rem;
+      line-height: 1;
+      color: #fff;
+      font-weight: 900;
+    }
+    .p-verdict-text {
+      font-size: 1.5rem;
+      font-weight: 900;
+      color: #fff;
+      letter-spacing: 0.04em;
+      margin-top: 2px;
+    }
+    .p-verdict-sub {
+      font-size: 0.82rem;
+      color: rgba(255,255,255,0.8);
+      margin-top: 4px;
+    }
+
+    /* Wrong card tint */
+    .p-card--wrong { background: #fff5f5 !important; }
     .p-card--wrong .p-card-year  { color: #dc2626 !important; }
     .p-card--wrong .p-card-title { color: #7f1d1d; }
     .p-card--wrong .p-card-artist{ color: #b91c1c; }
