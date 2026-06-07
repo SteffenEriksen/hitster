@@ -1629,7 +1629,8 @@ dom.progressBarWrap.addEventListener('click', async (e) => {
     });
 
     _io.on('player:steal_requested', ({ teamIndex }) => {
-      if (state._stealPhase === 'available') requestSteal(teamIndex);
+      // requestSteal() itself guards phase (allows during 'playing' OR 'available')
+      requestSteal(teamIndex);
     });
     _io.on('player:steal_slot_selected', ({ slotIndex }) => {
       if (state._stealPhase === 'placing') selectStealSlot(slotIndex);
