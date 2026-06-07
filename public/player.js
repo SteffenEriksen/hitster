@@ -241,9 +241,9 @@ function renderRevealedPanel(snap, isMyTurn) {
   if (isNextTeam) {
     html +=
       h('div', 'p-next-banner', '🎯 Your team is up next!') +
-      '<button id="p-next-team-btn" class="p-btn" style="margin-top:4px">▶ Start Our Turn &amp; Play</button>';
+      '<button id="p-next-team-btn" class="p-btn" style="margin:8px 16px 0;width:calc(100% - 32px)">▶ Start Our Turn &amp; Play</button>';
   } else {
-    html += '<button id="p-continue-btn" class="p-btn" style="margin-top:4px">Continue →</button>';
+    html += '<button id="p-continue-btn" class="p-btn" style="margin:8px 16px 0;width:calc(100% - 32px)">Continue →</button>';
   }
   return html;
 }

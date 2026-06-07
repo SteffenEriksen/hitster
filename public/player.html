@@ -9,14 +9,14 @@
   <script>(function(){var t=localStorage.getItem('hitster_theme');if(t)document.documentElement.classList.add(t);})();</script>
   <style>
     /* ── Player-page specific overrides ── */
-    body { background: var(--bg, #f5f5f5); min-height: 100dvh; }
-    #app { max-width: 480px; margin: 0 auto; padding: 20px 16px 40px; display: flex; flex-direction: column; gap: 16px; min-height: 100dvh; }
+    body { background: var(--bg, #f5f5f5); min-height: 100dvh; margin: 0; }
+    #app { width: 100%; padding: 0 0 48px; display: flex; flex-direction: column; gap: 0; min-height: 100dvh; box-sizing: border-box; }
 
     /* Cards */
-    .p-card { background: #fff; border-radius: var(--radius, 16px); padding: 20px; box-shadow: 0 2px 12px rgba(0,0,0,0.06); }
+    .p-card { background: #fff; border-radius: 0; padding: 16px; box-shadow: none; border-bottom: 1px solid var(--grey-100, #f3f4f6); }
 
     /* Header */
-    .p-header { background: var(--green-dark, #004444); color: #fff; border-radius: var(--radius, 16px); padding: 16px 20px; display: flex; align-items: center; justify-content: space-between; }
+    .p-header { background: var(--green-dark, #004444); color: #fff; border-radius: 0; padding: 14px 16px; display: flex; align-items: center; justify-content: space-between; }
     .p-header-title { font-size: 1.1rem; font-weight: 800; }
     .p-room-code { font-size: 0.75rem; font-weight: 700; background: rgba(255,255,255,0.15); border-radius: 20px; padding: 3px 10px; letter-spacing: 0.08em; }
     .p-header > span:last-child { font-size: 0.65rem; opacity: 0.65; }
@@ -65,7 +65,7 @@
     .p-card-artist { font-size: 0.88rem; color: var(--grey-500); }
 
     /* Result banner */
-    .p-result { padding: 12px 16px; border-radius: 10px; font-weight: 700; text-align: center; font-size: 0.95rem; }
+    .p-result { padding: 12px 16px; border-radius: 0; font-weight: 700; text-align: center; font-size: 0.95rem; }
     .p-result.correct { background: #dcfce7; color: #166534; }
     .p-result.wrong   { background: #dc2626; color: #fff; font-size: 1rem; letter-spacing: 0.01em; }
 
@@ -85,24 +85,19 @@
     .p-btn-steal-pre:hover { background: #ffedd5; }
     .p-presteal-confirm { background: #fff7ed; border: 1px solid #f97316; border-radius: 10px; padding: 12px; margin-top: 8px; }
     .p-steal-committed { background: #fff7ed; border: 1px solid #f97316; border-radius: 10px; padding: 10px 14px; font-size: 0.88rem; font-weight: 700; color: #c2410c; text-align: center; margin-top: 8px; }
-    .p-next-banner { background: var(--green, #007272); color: #fff; border-radius: 10px; padding: 10px 16px; font-size: 0.9rem; font-weight: 700; text-align: center; margin-top: 4px; }
+    .p-next-banner { background: var(--green, #007272); color: #fff; border-radius: 0; padding: 12px 16px; font-size: 0.9rem; font-weight: 700; text-align: center; }
 
     /* Scoreboard + card decks */
-    .p-scoreboard { display: flex; flex-direction: column; gap: 10px; }
+    .p-scoreboard { display: flex; flex-direction: column; gap: 0; }
     .p-team-deck {
       background: var(--grey-50, #f9fafb);
-      border: 1px solid var(--grey-100, #f3f4f6);
-      border-radius: 12px;
-      padding: 10px 12px;
+      border: none;
+      border-bottom: 1px solid var(--grey-100, #f3f4f6);
+      padding: 12px 16px;
     }
-    .p-team-deck--current { border-color: var(--green, #007272); background: #f0fdfa; }
-    .p-team-deck--mine {
-      border-color: #6366f1;
-      border-width: 2px;
-      background: #f5f3ff;
-      box-shadow: inset 4px 0 0 #6366f1;
-    }
-    .p-team-deck--current.p-team-deck--mine { border-color: var(--green); background: #f0fdfa; box-shadow: inset 4px 0 0 var(--green); }
+    .p-team-deck--current { background: #f0fdfa; border-left: 4px solid var(--green, #007272); }
+    .p-team-deck--mine    { background: #f5f3ff; border-left: 4px solid #6366f1; box-shadow: none; }
+    .p-team-deck--current.p-team-deck--mine { background: #f0fdfa; border-left: 4px solid var(--green); box-shadow: none; }
     .p-deck-header { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; }
     .p-deck-name   { font-size: 0.88rem; font-weight: 700; color: var(--grey-800); flex: 1; }
     .p-team-deck--mine .p-deck-name { color: #4f46e5; }
@@ -130,10 +125,10 @@
     .p-deck-title { font-size: 0.6rem; color: var(--grey-500); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 70px; }
 
     /* Status banners */
-    .p-status { text-align: center; color: var(--grey-500); font-size: 0.9rem; padding: 8px 0; }
+    .p-status { text-align: center; color: var(--grey-500); font-size: 0.9rem; padding: 8px 16px; }
     .p-waiting { font-size: 0.85rem; color: var(--grey-400); text-align: center; }
-    .p-catchup { background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; padding: 10px 14px; font-size: 0.82rem; color: #92400e; text-align: center; }
-    .p-error { background: #fee2e2; border: 1px solid #fecaca; border-radius: 10px; padding: 16px; text-align: center; color: #991b1b; font-weight: 600; }
+    .p-catchup { background: #fffbeb; border-bottom: 1px solid #fde68a; padding: 10px 16px; font-size: 0.82rem; color: #92400e; text-align: center; }
+    .p-error { background: #fee2e2; border-left: 4px solid #fecaca; padding: 16px; text-align: center; color: #991b1b; font-weight: 600; }
     .p-section-title { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--grey-400); margin-bottom: 4px; }
     .p-connecting { text-align: center; color: var(--grey-400); padding: 40px 0; }
   </style>
