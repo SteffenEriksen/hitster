@@ -107,6 +107,39 @@
     .p-btn-steal-pre:hover { background: #ffedd5; }
     .p-presteal-confirm { background: #fff7ed; border: 1px solid #f97316; border-radius: 10px; padding: 12px; margin-top: 8px; }
     .p-steal-committed { background: #fff7ed; border: 1px solid #f97316; border-radius: 10px; padding: 10px 14px; font-size: 0.88rem; font-weight: 700; color: #c2410c; text-align: center; margin-top: 8px; }
+
+    /* Steal queue banner — shows all committed teams */
+    .p-steal-queue-banner {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 6px;
+      background: #fff7ed;
+      border-top: 1px solid #fed7aa;
+      padding: 8px 0 4px;
+      margin-top: 8px;
+    }
+    .p-steal-queue-label { font-size: 0.75rem; font-weight: 700; color: #c2410c; white-space: nowrap; }
+    .p-steal-queue-pill {
+      font-size: 0.75rem;
+      font-weight: 700;
+      background: #fed7aa;
+      color: #92400e;
+      border-radius: 20px;
+      padding: 2px 10px;
+    }
+    .p-steal-queue-pill--mine {
+      background: #f97316;
+      color: #fff;
+    }
+    .p-steal-queue-first {
+      font-size: 0.62rem;
+      background: rgba(0,0,0,0.15);
+      border-radius: 10px;
+      padding: 1px 5px;
+      margin-left: 2px;
+      vertical-align: middle;
+    }
     .p-next-banner { background: var(--green, #007272); color: #fff; border-radius: 0; padding: 12px 16px; font-size: 0.9rem; font-weight: 700; text-align: center; }
 
     /* Scoreboard + card decks */

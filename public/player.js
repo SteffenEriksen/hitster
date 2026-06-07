@@ -187,18 +187,34 @@ function renderPlayingPanel(snap, isMyTurn, myCards) {
   }
   // Other team's turn
   const stealAvailable    = snap.stealPhase === 'available';
-  const alreadyQueued     = (snap.stealQueue || []).some(s => s.teamIndex === myTeamIndex);
-  const queuePos          = (snap.stealQueue || []).findIndex(s => s.teamIndex === myTeamIndex);
+  const queue             = snap.stealQueue || [];
+  const alreadyQueued     = queue.some(s => s.teamIndex === myTeamIndex);
+  const queuePos          = queue.findIndex(s => s.teamIndex === myTeamIndex);
+
+  // Show all teams that have committed to steal (visible to everyone)
+  let stealQueueBanner = '';
+  if (queue.length > 0) {
+    const pills = queue.map((s, i) => {
+      const isMine = s.teamIndex === myTeamIndex;
+      return '<span class="p-steal-queue-pill' + (isMine ? ' p-steal-queue-pill--mine' : '') + '">'
+        + (isMine ? '★ ' : '') + esc(s.name)
+        + (i === 0 ? ' <span class="p-steal-queue-first">1st</span>' : '')
+        + '</span>';
+    }).join('');
+    stealQueueBanner =
+      '<div class="p-steal-queue-banner">' +
+        '<span class="p-steal-queue-label">🤚 Ready to steal:</span>' +
+        pills +
+      '</div>';
+  }
 
   let stealBtn = '';
   if (alreadyQueued) {
     stealBtn = h('div', 'p-steal-committed',
-      '🤚 Committed to steal' + (queuePos >= 0 ? ' — #' + (queuePos + 1) + ' in line' : '') + '!');
+      '🤚 You\'re committed — #' + (queuePos + 1) + ' in line');
   } else if (stealAvailable) {
-    // Steal window is open — show claim button
     stealBtn = '<button id="p-steal-btn" class="p-btn" style="background:#e85d04;margin-top:8px">🤚 Steal!</button>';
   } else if (snap.stealEnabled) {
-    // Pre-registration: commit intent before placement happens
     stealBtn =
       '<button id="p-presteal-btn" class="p-btn-steal-pre" style="margin-top:8px">🤚 Commit to Steal</button>' +
       '<div id="p-presteal-confirm" class="p-presteal-confirm hidden">' +
@@ -216,6 +232,7 @@ function renderPlayingPanel(snap, isMyTurn, myCards) {
       : h('p', 'p-status', '🎵 ' + esc(snap.currentTeamName) + ' is choosing…')) +
     h('p', 'p-section-title', 'Their timeline') +
     renderTimeline(snap.teams[snap.currentTeamIndex]?.cards || [], false, null) +
+    stealQueueBanner +
     stealBtn);
 }
 
