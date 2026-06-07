@@ -313,6 +313,27 @@ function showStartingCards() {
   dom.startingOverlay.classList.remove('hidden');
   dom.btnLetsPlay.onclick = () => {
     dom.startingOverlay.classList.add('hidden');
+    // If multiplayer room is active, show QR first so players can scan
+    if (_roomCode) {
+      const overlay  = $('qr-overlay');
+      const img      = $('qr-img');
+      const urlEl    = $('qr-url');
+      const closeBtn = $('btn-qr-close');
+      if (overlay) {
+        const joinUrl = location.origin + '/player?room=' + _roomCode;
+        if (urlEl) urlEl.textContent = joinUrl;
+        if (img)   img.src = 'https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=' + encodeURIComponent(joinUrl);
+        if (closeBtn) {
+          closeBtn.textContent = "▶ Let's Play!";
+          closeBtn.addEventListener('click', () => {
+            closeBtn.textContent = 'Close';
+            enterPreTurn();
+          }, { once: true });
+        }
+        overlay.classList.remove('hidden');
+        return;   // enterPreTurn() fires when player closes the QR
+      }
+    }
     enterPreTurn();
   };
 }
