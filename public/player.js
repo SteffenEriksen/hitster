@@ -330,6 +330,34 @@ function renderError(msg) {
     '<button class="p-btn p-btn-ghost" onclick="location.href=\'/\'" style="margin-top:12px">Go home</button>';
 }
 
+function renderRoomError(msg) {
+  app.innerHTML =
+    h('div', 'p-header', h('span', 'p-header-title', '🎵 Hitster')) +
+    h('div', 'p-error', esc(msg)) +
+    h('div', 'p-card',
+      h('p', 'p-section-title', 'Enter a room code') +
+      '<div style="display:flex;gap:8px;margin-top:4px">' +
+        '<input id="p-room-input" class="p-input" type="text" maxlength="6" ' +
+          'placeholder="e.g. AB3F" autocomplete="off" spellcheck="false" ' +
+          'style="text-transform:uppercase;letter-spacing:0.12em;font-weight:700">' +
+        '<button id="p-room-join-btn" class="p-btn" style="width:auto;padding:12px 20px">Join</button>' +
+      '</div>') +
+    '<button class="p-btn p-btn-ghost" onclick="location.href=\'/\'" style="margin-top:8px">Go home</button>';
+
+  const input = document.getElementById('p-room-input');
+  const btn   = document.getElementById('p-room-join-btn');
+
+  function tryJoin() {
+    const code = (input?.value || '').trim().toUpperCase();
+    if (code.length < 2) return;
+    location.href = '/player?room=' + encodeURIComponent(code);
+  }
+
+  btn?.addEventListener('click', tryJoin);
+  input?.addEventListener('keydown', e => { if (e.key === 'Enter') tryJoin(); });
+  input?.focus();
+}
+
 // ─── Event wiring ─────────────────────────────────────────────────────────────
 
 function attachSlotListeners(snap, isMyTurn) {
@@ -471,7 +499,7 @@ function initSocket() {
   });
 
   socket.on('room:error', ({ message }) => {
-    renderError(message);
+    renderRoomError(message);
   });
 
   socket.on('room:join_ok', ({ players, snapshot }) => {
