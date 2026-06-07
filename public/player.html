@@ -86,14 +86,20 @@
       padding: 10px 12px;
     }
     .p-team-deck--current { border-color: var(--green, #007272); background: #f0fdfa; }
-    .p-team-deck--mine    { border-color: #6366f1; background: #f5f3ff; }
-    .p-team-deck--current.p-team-deck--mine { border-color: var(--green); background: #f0fdfa; }
+    .p-team-deck--mine {
+      border-color: #6366f1;
+      border-width: 2px;
+      background: #f5f3ff;
+      box-shadow: inset 4px 0 0 #6366f1;
+    }
+    .p-team-deck--current.p-team-deck--mine { border-color: var(--green); background: #f0fdfa; box-shadow: inset 4px 0 0 var(--green); }
     .p-deck-header { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; }
     .p-deck-name   { font-size: 0.88rem; font-weight: 700; color: var(--grey-800); flex: 1; }
+    .p-team-deck--mine .p-deck-name { color: #4f46e5; }
     .p-deck-count  { font-size: 0.72rem; font-weight: 600; color: var(--grey-500); }
     .p-deck-badge  { font-size: 0.65rem; font-weight: 700; border-radius: 20px; padding: 2px 8px; white-space: nowrap; }
     .p-deck-badge--playing { background: var(--green, #007272); color: #fff; }
-    .p-deck-badge--me      { background: #6366f1; color: #fff; }
+    .p-deck-badge--me      { background: #6366f1; color: #fff; font-size: 0.72rem; padding: 3px 10px; }
     .p-deck-empty { font-size: 0.75rem; color: var(--grey-400); font-style: italic; margin: 0; }
     .p-deck-scroll {
       display: flex;
