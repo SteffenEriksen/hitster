@@ -1730,6 +1730,26 @@ button { cursor: pointer; font-family: inherit; border: none; outline: none; }
 }
 .year-edit-input:focus { outline: none; border-color: var(--primary, #007272); }
 
+/* ─── Steal indicator (host view during playing phase) ──────────────────────── */
+.steal-indicator {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 6px 20px;
+  background: #fff7ed;
+  border-bottom: 1px solid #fed7aa;
+  font-size: 0.8rem;
+}
+.steal-indicator-text { color: #c2410c; font-weight: 600; }
+.host-steal-team-btns { display: flex; gap: 6px; flex-wrap: wrap; }
+.btn-host-steal-team {
+  background: transparent; border: 1.5px solid #f97316; color: #c2410c;
+  border-radius: 20px; padding: 2px 10px; font-size: 0.72rem; font-weight: 700;
+  font-family: inherit; cursor: pointer; transition: background 0.12s;
+}
+.btn-host-steal-team:hover { background: #ffedd5; }
+
 /* ─── Steal section ──────────────────────────────────────────────────────────── */
 .steal-section {
   display: flex;

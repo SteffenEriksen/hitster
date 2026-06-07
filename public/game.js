@@ -114,6 +114,9 @@ const dom = {
   stealSection:   $('steal-section'),
   stealTeamBtns:  $('steal-team-btns'),
   btnSkipSteal:   $('btn-skip-steal'),
+  stealIndicator:     $('steal-indicator'),
+  stealIndicatorText: $('steal-indicator-text'),
+  hostStealTeamBtns:  $('host-steal-team-btns'),
 };
 
 // ─── Game state ───────────────────────────────────────────────────────────────
@@ -144,6 +147,7 @@ const state = {
   _stealQueue:    [],     // [{ teamIndex, name }] ordered by claim time
   _stealQueueIdx: 0,      // index of current stealer in queue
   _stealSlot:     null,   // slot selected by current stealer
+  _blindSteal:    false,  // true = steal was pre-registered; card stays hidden until steal resolves
 };
 
 // ─── Multiplayer state ────────────────────────────────────────────────────────
@@ -434,8 +438,9 @@ function buildSnapshot() {
     isTiebreaker: state.isTiebreaker,
     selectedSlot: state.selectedSlot,
     // Card is face-down during 'playing' — don't reveal title/artist/year to players
+    // Also keep hidden during steal-placing when steal was pre-registered (blind steal)
     card: state.currentCard
-      ? state.phase === 'playing'
+      ? (state.phase === 'playing' || (state._stealPhase === 'placing' && state._blindSteal))
         ? { faceDown: true }
         : { year: state.currentCard.year, yearUncertain: !!state.currentCard.yearUncertain,
             title: state.currentCard.title, artist: state.currentCard.artist,
@@ -600,6 +605,7 @@ function enterPreTurn() {
   dom.btnEditYear.classList.add('hidden');
   dom.stealSection.classList.add('hidden');
   dom.btnConfirmSteal.classList.add('hidden');
+  state._blindSteal = false;
   closeStealWindow();
   hidePlaybackError();
   dom.suddenDeathOverlay.classList.add('hidden');
@@ -687,6 +693,7 @@ async function beginTurn() {
     hidePlaybackError();
     startProgress(card.duration);
     emitState();
+    _updateStealIndicator();  // show steal registration bar now that music is playing
   } catch (e) {
     state.isPlaying = false;
     dom.btnPauseResume.textContent = '▶ Resume';
@@ -774,18 +781,30 @@ function finishPlacement(correct, slot, fromHardMode = false) {
   dom.hardChallenge.classList.add('hidden');
   dom.overturnSection.classList.add('hidden');
   dom.overturnConfirm.classList.add('hidden');
+  // Steal registration closed once placement is confirmed
+  dom.stealIndicator?.classList.add('hidden');
 
   const card = state.currentCard;
-  dom.nowPlayingInfo.textContent = card.title + ' – ' + card.artist;
-  dom.cardFacedown.classList.add('hidden');
-  dom.revealYear.textContent = (card.yearUncertain ? '~' : '') + (card.year || '?');
-  dom.revealYear.title = card.yearUncertain ? 'Year may be approximate — could not confirm via MusicBrainz' : '';
-  dom.revealTitle.textContent  = card.title;
-  dom.revealArtist.textContent = card.artist;
-  dom.cardRevealed.classList.remove('hidden');
-  dom.cardRevealed.classList.toggle('wrong', !correct);
+  // Blind steal: if teams pre-registered AND placement is wrong, keep card hidden
+  const isBlindSteal = !correct && state.stealEnabled && state._stealQueue.length > 0;
 
-  showDecadeReveal(state.currentCard);
+  if (isBlindSteal) {
+    // Keep card face-down — stealers will pick blind; reveal after all steal attempts
+    state._blindSteal = true;
+    dom.nowPlayingInfo.textContent = '?? – ??';
+    // cardFacedown stays visible; cardRevealed stays hidden
+  } else {
+    // Normal reveal
+    dom.nowPlayingInfo.textContent = card.title + ' – ' + card.artist;
+    dom.cardFacedown.classList.add('hidden');
+    dom.revealYear.textContent = (card.yearUncertain ? '~' : '') + (card.year || '?');
+    dom.revealYear.title = card.yearUncertain ? 'Year may be approximate — could not confirm via MusicBrainz' : '';
+    dom.revealTitle.textContent  = card.title;
+    dom.revealArtist.textContent = card.artist;
+    dom.cardRevealed.classList.remove('hidden');
+    dom.cardRevealed.classList.toggle('wrong', !correct);
+    showDecadeReveal(state.currentCard);
+  }
 
   dom.resultBanner.classList.remove('hidden');
   if (correct) {
@@ -797,7 +816,7 @@ function finishPlacement(correct, slot, fromHardMode = false) {
     state._stealQueueIdx = 0;
   } else {
     dom.resultBanner.className = 'result-banner wrong';
-    dom.resultText.textContent = '✗ Wrong! Card discarded.';
+    dom.resultText.textContent = isBlindSteal ? '✗ Wrong! Steal in progress…' : '✗ Wrong! Card discarded.';
     if (fromHardMode) {
       state.pendingOverturnSlot = slot;
       dom.overturnTeamName.textContent = team.name;
@@ -810,11 +829,13 @@ function finishPlacement(correct, slot, fromHardMode = false) {
   renderCurrentTeamBar();
   renderOtherTeams();
 
-  // Always show the subtle edit button; auto-open the section only when uncertain
-  dom.btnEditYear.classList.remove('hidden');
-  if (card.yearUncertain) {
-    dom.yearEditInput.value = card.year;
-    dom.yearEditSection.classList.remove('hidden');
+  // Only show year-edit for non-blind-steal (card is hidden during blind steal)
+  if (!isBlindSteal) {
+    dom.btnEditYear.classList.remove('hidden');
+    if (card.yearUncertain) {
+      dom.yearEditInput.value = card.year;
+      dom.yearEditSection.classList.remove('hidden');
+    }
   }
 
   if (correct && outcomeAlreadyDetermined()) {
@@ -1076,6 +1097,7 @@ function requestSteal(teamIndex) {
   state._stealQueue.push({ teamIndex, name: team.name });
   _renderStealTeamBtns();
   emitState();
+  _updateStealIndicator();  // refresh host indicator
   // Only auto-start if steal window is already open (placement already failed)
   if (state._stealPhase === 'available' && state._stealQueue.length === 1) startStealAttempt();
 }
@@ -1163,12 +1185,59 @@ function confirmSteal() {
 }
 
 function closeStealWindow() {
+  // If this was a blind steal, reveal the card now that all attempts are done
+  if (state._blindSteal) {
+    state._blindSteal = false;
+    _revealCardUI();
+  }
   state._stealPhase   = null;
   state._stealQueue   = [];
   state._stealQueueIdx = 0;
   state._stealSlot    = null;
   dom.stealSection.classList.add('hidden');
   dom.btnConfirmSteal.classList.add('hidden');
+}
+
+function _revealCardUI() {
+  const card = state.currentCard;
+  if (!card) return;
+  dom.nowPlayingInfo.textContent = card.title + ' – ' + card.artist;
+  dom.cardFacedown.classList.add('hidden');
+  dom.cardRevealed.classList.remove('hidden');
+  dom.revealYear.textContent = (card.yearUncertain ? '~' : '') + (card.year || '?');
+  dom.revealYear.title = card.yearUncertain ? 'Year may be approximate — could not confirm via MusicBrainz' : '';
+  dom.revealTitle.textContent = card.title;
+  dom.revealArtist.textContent = card.artist;
+  showDecadeReveal(card);
+  dom.btnEditYear.classList.remove('hidden');
+  if (card.yearUncertain) {
+    dom.yearEditInput.value = card.year;
+    dom.yearEditSection.classList.remove('hidden');
+  }
+}
+
+function _updateStealIndicator() {
+  if (!dom.stealIndicator) return;
+  if (!state.stealEnabled || state.phase !== 'playing') {
+    dom.stealIndicator.classList.add('hidden');
+    return;
+  }
+  dom.stealIndicator.classList.remove('hidden');
+  const curIdx = currentTeamIndex();
+
+  if (state._stealQueue.length > 0) {
+    dom.stealIndicatorText.textContent = '🤚 Ready to steal: ' + state._stealQueue.map(s => s.name).join(', ');
+    dom.hostStealTeamBtns.innerHTML = '';
+  } else {
+    dom.stealIndicatorText.textContent = '🤚 Mark steal:';
+    dom.hostStealTeamBtns.innerHTML = state.teams.map((t, i) => {
+      if (i === curIdx) return '';
+      return `<button class="btn-host-steal-team" data-team="${i}">${esc(t.name)}</button>`;
+    }).join('');
+    dom.hostStealTeamBtns.querySelectorAll('.btn-host-steal-team').forEach(btn => {
+      btn.addEventListener('click', () => requestSteal(parseInt(btn.dataset.team, 10)));
+    });
+  }
 }
 
 // ─── Winner screen (navigate to winner.html) ──────────────────────────────────
