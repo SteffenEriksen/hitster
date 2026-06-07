@@ -179,6 +179,7 @@ function renderGame(snap) {
   attachNextTeamListener();
   attachContinueListener(snap);
   attachStealListeners(snap);
+  attachWinnerJoinListener();
 }
 
 function renderPreTurnPanel(snap, isMyTurn, myCards) {
@@ -377,7 +378,16 @@ function renderFinishedPanel(snap) {
       '<div class="p-winner-sub">' + subtitle + '</div>' +
     '</div>' +
     '<div class="p-final-scores">' + scores + '</div>' +
-    '<button class="p-btn p-btn-ghost" onclick="location.href=\'/\'" style="margin:16px 16px 0;width:calc(100% - 32px)">Back to home</button>';
+    '<div class="p-card">' +
+      '<p class="p-section-title">Join another game</p>' +
+      '<div style="display:flex;gap:8px;margin-top:4px">' +
+        '<input id="p-winner-room-input" class="p-input" type="text" maxlength="6" ' +
+          'placeholder="Room code…" autocomplete="off" spellcheck="false" ' +
+          'style="text-transform:uppercase;letter-spacing:0.12em;font-weight:700">' +
+        '<button id="p-winner-join-btn" class="p-btn" style="width:auto;padding:12px 20px">Join</button>' +
+      '</div>' +
+    '</div>' +
+    '<button class="p-btn p-btn-ghost" onclick="location.href=\'/\'" style="margin:8px 16px 0;width:calc(100% - 32px)">Back to home</button>';
 }
 
 function renderError(msg) {
@@ -505,6 +515,20 @@ function attachContinueListener(snap) {
     seenReveal = false;
     renderGame(latestSnap);
   });
+}
+
+function attachWinnerJoinListener() {
+  const input = document.getElementById('p-winner-room-input');
+  const btn   = document.getElementById('p-winner-join-btn');
+  if (!btn || !input) return;
+  function tryJoin() {
+    const code = (input.value || '').trim().toUpperCase();
+    if (code.length < 2) return;
+    location.href = '/player?room=' + encodeURIComponent(code);
+  }
+  btn.addEventListener('click', tryJoin);
+  input.addEventListener('keydown', e => { if (e.key === 'Enter') tryJoin(); });
+  input.focus();
 }
 
 // ─── Reconnect overlay ────────────────────────────────────────────────────────
