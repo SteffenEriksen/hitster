@@ -451,7 +451,7 @@ function buildSnapshot() {
     currentStealer: state._stealQueue[state._stealQueueIdx]
       ? { teamIndex: state._stealQueue[state._stealQueueIdx].teamIndex,
           stealSlot: state._stealSlot,
-          cards:     state.teams[state._stealQueue[state._stealQueueIdx].teamIndex].cards.map(c => ({
+          cards:     currentTeam().cards.map(c => ({   // show CURRENT team's deck for slot selection
             year: c.year, yearUncertain: !!c.yearUncertain, title: c.title, artist: c.artist,
           })),
         }
@@ -1008,8 +1008,8 @@ function startStealAttempt() {
   dom.stealSection.classList.add('hidden');
   dom.btnConfirmSteal.classList.add('hidden');
 
-  // Show stealing team's timeline with slot buttons
-  renderTimeline(true, state.teams[stealer.teamIndex].cards, null, selectStealSlot);
+  // Show CURRENT team's timeline with slot buttons (steal is placed on their deck)
+  renderTimeline(true, currentTeam().cards, null, selectStealSlot);
   renderOtherTeams();
   emitState();
 }
@@ -1018,7 +1018,7 @@ function selectStealSlot(idx) {
   if (state._stealPhase !== 'placing') return;
   state._stealSlot = idx;
   const stealer = state._stealQueue[state._stealQueueIdx];
-  renderTimeline(true, state.teams[stealer.teamIndex].cards, idx, selectStealSlot);
+  renderTimeline(true, currentTeam().cards, idx, selectStealSlot);
   dom.btnConfirmSteal.classList.remove('hidden');
   emitState();
 }
@@ -1027,10 +1027,10 @@ function confirmSteal() {
   const stealer = state._stealQueue[state._stealQueueIdx];
   if (!stealer || state._stealSlot === null) return;
 
-  const stealTeam = state.teams[stealer.teamIndex];
-  const cards     = stealTeam.cards;
-  const slot      = state._stealSlot;
-  const year      = state.currentCard.year;
+  const stealTeam  = state.teams[stealer.teamIndex];
+  const cards      = currentTeam().cards;   // placement checked on the CURRENT team's deck
+  const slot       = state._stealSlot;
+  const year       = state.currentCard.year;
 
   const leftOk  = slot === 0 || cards[slot - 1].year <= year;
   const rightOk = slot >= cards.length || cards[slot].year >= year;
@@ -1040,7 +1040,8 @@ function confirmSteal() {
   dom.btnConfirmSteal.classList.add('hidden');
 
   if (correct) {
-    stealTeam.cards.splice(slot, 0, state.currentCard);
+    stealTeam.cards.push(state.currentCard); // card joins the STEALING team's timeline
+    stealTeam.cards.sort((a, b) => a.year - b.year); // keep timeline ordered
     dom.resultBanner.className = 'result-banner correct';
     dom.resultText.textContent = '🤚 Steal! ' + stealer.name + ' takes the card!';
   } else {
@@ -1051,8 +1052,7 @@ function confirmSteal() {
   }
 
   dom.resultBanner.classList.remove('hidden');
-  // Show correct team's cards in the timeline after steal
-  renderTimeline(false, stealTeam.cards, null, null);
+  renderTimeline(false, currentTeam().cards, null, null); // keep showing current team's deck
   renderOtherTeams();
   renderScoreChips();
 

@@ -235,11 +235,11 @@ function renderRevealedPanel(snap, isMyTurn) {
 
 function renderStealPlacingPanel(snap) {
   const stealer = snap.currentStealer;
-  const cards   = stealer?.cards || [];
+  const cards   = stealer?.cards || [];   // this is now the CURRENT team's deck
   const sel     = stealer?.stealSlot ?? null;
   return h('div', 'p-card',
     h('div', 'p-next-banner', '🤚 Your team is stealing!') +
-    h('p', 'p-waiting', 'Place the card on your timeline:') +
+    h('p', 'p-waiting', 'Place the card correctly on ' + esc(snap.currentTeamName) + '\'s timeline:') +
     renderTimeline(cards, true, sel) +
     (sel !== null
       ? h('p', 'p-status', '✓ Slot ' + (sel + 1) + ' selected') +
