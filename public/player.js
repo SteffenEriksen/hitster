@@ -422,14 +422,48 @@ function attachContinueListener(snap) {
   });
 }
 
+// ─── Reconnect overlay ────────────────────────────────────────────────────────
+
+function showReconnectOverlay() {
+  if (document.getElementById('p-reconnect-overlay')) return;
+  const el = document.createElement('div');
+  el.id = 'p-reconnect-overlay';
+  el.style.cssText =
+    'position:fixed;inset:0;background:rgba(0,0,0,0.55);display:flex;' +
+    'align-items:center;justify-content:center;z-index:999;backdrop-filter:blur(2px)';
+  el.innerHTML =
+    '<div style="background:#fff;padding:24px 28px;border-radius:14px;text-align:center;' +
+    'max-width:280px;display:flex;flex-direction:column;gap:8px">' +
+    '<div style="font-size:1.5rem">⏳</div>' +
+    '<p style="font-weight:800;color:#111827;margin:0">Reconnecting…</p>' +
+    '<p style="font-size:0.8rem;color:#6b7280;margin:0">Connection dropped. Reconnecting automatically.</p>' +
+    '</div>';
+  document.body.appendChild(el);
+}
+
+function hideReconnectOverlay() {
+  document.getElementById('p-reconnect-overlay')?.remove();
+}
+
 // ─── Socket setup ─────────────────────────────────────────────────────────────
 
 function initSocket() {
-  socket = io();
+  socket = io({
+    reconnectionDelay:    500,
+    reconnectionDelayMax: 3000,
+    timeout:              10000,
+    transports: ['websocket', 'polling'],
+  });
 
   socket.on('connect', () => {
+    hideReconnectOverlay();
     if (!roomCode) { renderError('No room code in URL. Scan the QR code again.'); return; }
-    socket.emit('player:get_room_info', { code: roomCode });
+    if (joined) {
+      // Reconnected after a drop — re-join to restore snapshot
+      socket.emit('player:join', { code: roomCode, name: myName, teamIndex: myTeamIndex });
+    } else {
+      socket.emit('player:get_room_info', { code: roomCode });
+    }
   });
 
   socket.on('room:info', ({ teams }) => {
@@ -441,10 +475,10 @@ function initSocket() {
   });
 
   socket.on('room:join_ok', ({ players, snapshot }) => {
+    hideReconnectOverlay();
     joined = true;
     latestSnap = snapshot;
     if (snapshot && snapshot.phase && snapshot.phase !== 'pre-turn') {
-      // Only mark as catching-up if there's a reveal to catch (don't leak card during 'playing')
       caughtUp = snapshot.phase !== 'revealed';
       renderGame(snapshot);
     } else {
@@ -468,12 +502,12 @@ function initSocket() {
     // If the new snapshot is 'revealed' and we haven't shown it yet → show it
     if (snapshot.phase === 'revealed' && (!prev || prev.phase !== 'revealed')) {
       seenReveal = true;
-      caughtUp = true;   // always show the reveal immediately
+      caughtUp = true;
     }
 
     // If we haven't caught up to a previous reveal, stay on catch-up view
     if (!caughtUp && snapshot.phase !== 'revealed') {
-      renderGame(snapshot);  // keeps catch-up banner, updates scores
+      renderGame(snapshot);
       return;
     }
 
@@ -481,22 +515,19 @@ function initSocket() {
   });
 
   socket.on('room:host_left', () => {
+    hideReconnectOverlay();
     renderError('The host has disconnected. The game has ended.');
+  });
+
+  socket.on('disconnect', (reason) => {
+    if (reason === 'io server disconnect') return;
+    if (joined) showReconnectOverlay();
   });
 
   socket.on('connect_error', () => {
     if (!joined) {
       app.innerHTML = h('div', 'p-connecting',
-        'Could not connect to the game server. Make sure you\'re on the same network as the host.');
-    }
-  });
-
-  socket.on('disconnect', () => {
-    if (joined) {
-      const banner = document.createElement('div');
-      banner.className = 'p-catchup';
-      banner.textContent = '⚠ Reconnecting…';
-      app.prepend(banner);
+        'Could not connect to the game server. Check your connection and refresh.');
     }
   });
 }
