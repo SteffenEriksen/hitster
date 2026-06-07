@@ -134,6 +134,23 @@ function renderGame(snap) {
     content += h('div', 'p-catchup', '⏩ The game has moved on — tap Continue below to catch up.');
   }
 
+  // Steal queue banner — shown to ALL players when teams have pre-registered
+  const globalQueue = snap.stealQueue || [];
+  if (snap.phase === 'playing' && globalQueue.length > 0) {
+    const pills = globalQueue.map((s, i) => {
+      const isMine = s.teamIndex === myTeamIndex;
+      return '<span class="p-steal-queue-pill' + (isMine ? ' p-steal-queue-pill--mine' : '') + '">'
+        + (isMine ? '★ ' : '') + esc(s.name)
+        + (i === 0 ? ' <span class="p-steal-queue-first">1st</span>' : '')
+        + '</span>';
+    }).join('');
+    content +=
+      '<div class="p-steal-queue-banner">' +
+        '<span class="p-steal-queue-label">🤚 Ready to steal:</span>' +
+        pills +
+      '</div>';
+  }
+
   // Phase-specific panel
   const isCurrentStealer = snap.currentStealer?.teamIndex === myTeamIndex;
 
@@ -186,28 +203,12 @@ function renderPlayingPanel(snap, isMyTurn, myCards) {
         : h('p', 'p-waiting', 'Tap a + to place the card')));
   }
   // Other team's turn
-  const stealAvailable    = snap.stealPhase === 'available';
-  const queue             = snap.stealQueue || [];
-  const alreadyQueued     = queue.some(s => s.teamIndex === myTeamIndex);
-  const queuePos          = queue.findIndex(s => s.teamIndex === myTeamIndex);
+  const stealAvailable = snap.stealPhase === 'available';
+  const queue          = snap.stealQueue || [];
+  const alreadyQueued  = queue.some(s => s.teamIndex === myTeamIndex);
+  const queuePos       = queue.findIndex(s => s.teamIndex === myTeamIndex);
 
-  // Show all teams that have committed to steal (visible to everyone)
-  let stealQueueBanner = '';
-  if (queue.length > 0) {
-    const pills = queue.map((s, i) => {
-      const isMine = s.teamIndex === myTeamIndex;
-      return '<span class="p-steal-queue-pill' + (isMine ? ' p-steal-queue-pill--mine' : '') + '">'
-        + (isMine ? '★ ' : '') + esc(s.name)
-        + (i === 0 ? ' <span class="p-steal-queue-first">1st</span>' : '')
-        + '</span>';
-    }).join('');
-    stealQueueBanner =
-      '<div class="p-steal-queue-banner">' +
-        '<span class="p-steal-queue-label">🤚 Ready to steal:</span>' +
-        pills +
-      '</div>';
-  }
-
+  // Personal steal status (queue banner is now shown globally above this panel)
   let stealBtn = '';
   if (alreadyQueued) {
     stealBtn = h('div', 'p-steal-committed',
@@ -232,7 +233,6 @@ function renderPlayingPanel(snap, isMyTurn, myCards) {
       : h('p', 'p-status', '🎵 ' + esc(snap.currentTeamName) + ' is choosing…')) +
     h('p', 'p-section-title', 'Their timeline') +
     renderTimeline(snap.teams[snap.currentTeamIndex]?.cards || [], false, null) +
-    stealQueueBanner +
     stealBtn);
 }
 
@@ -614,7 +614,7 @@ function initSocket() {
   });
 
   socket.on('disconnect', (reason) => {
-    if (reason === 'io server disconnect') return;
+    if (reason === 'io server disconnect' || reason === 'io client disconnect') return;
     if (joined) showReconnectOverlay();
   });
 
