@@ -351,11 +351,33 @@ function renderScoreboardAndDecks(snap) {
 
 function renderFinishedPanel(snap) {
   if (!snap.winnerIndices) return '';
-  const winners = snap.winnerIndices.map(i => snap.teams[i].name);
-  return h('div', 'p-card',
-    h('h2', '', '🏆 ' + esc(winners.join(' & ')) + (winners.length > 1 ? ' tie!' : ' wins!')) +
-    h('div', 'p-scores', renderScoreChips(snap)) +
-    '<button class="p-btn p-btn-ghost" onclick="location.href=\'\/\'" style="margin-top:12px">Back to home</button>');
+  const winners  = snap.winnerIndices.map(i => snap.teams[i]);
+  const isTied   = winners.length > 1;
+  const names    = winners.map(w => esc(w.name)).join(' & ');
+  const subtitle = isTied
+    ? 'Tied with ' + winners[0].cards.length + ' cards each!'
+    : winners[0].cards.length + ' songs placed correctly 🎵';
+
+  const emojis = ['🎉','🏆','🎊','🥇','🎵','⭐'];
+  const e = emojis[Math.floor(Math.random() * emojis.length)];
+
+  const scores = [...snap.teams]
+    .sort((a, b) => b.cards.length - a.cards.length)
+    .map(t => {
+      const isWinner = snap.winnerIndices.some(i => snap.teams[i].name === t.name);
+      return '<div class="p-final-score-row' + (isWinner ? ' p-final-score-row--winner' : '') + '">' +
+        '<span class="p-final-score-name">' + (isWinner ? '🏆 ' : '') + esc(t.name) + '</span>' +
+        '<span class="p-final-score-cards">' + t.cards.length + ' cards</span>' +
+        '</div>';
+    }).join('');
+
+  return '<div class="p-winner-header">' +
+      '<div class="p-winner-emoji">' + e + '</div>' +
+      '<div class="p-winner-name">' + names + (isTied ? ' tie!' : ' wins!') + '</div>' +
+      '<div class="p-winner-sub">' + subtitle + '</div>' +
+    '</div>' +
+    '<div class="p-final-scores">' + scores + '</div>' +
+    '<button class="p-btn p-btn-ghost" onclick="location.href=\'/\'" style="margin:16px 16px 0;width:calc(100% - 32px)">Back to home</button>';
 }
 
 function renderError(msg) {
@@ -575,10 +597,19 @@ function initSocket() {
     }
 
     renderGame(snapshot);
+
+    // Game over — show winner screen then disconnect; no more sync needed
+    if (snapshot.phase === 'finished' && snapshot.winnerIndices?.length > 0) {
+      setTimeout(() => {
+        try { socket.disconnect(); } catch (_) {}
+      }, 1500);
+    }
   });
 
   socket.on('room:host_left', () => {
     hideReconnectOverlay();
+    // If game ended normally the winner screen is already showing — don't replace it
+    if (latestSnap?.phase === 'finished') return;
     renderError('The host has disconnected. The game has ended.');
   });
 

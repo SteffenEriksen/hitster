@@ -1265,21 +1265,24 @@ function showWinnerScreen(winnerIndices) {
     hardModeAll:   state.hardModeAll,
     playlistName:  dom.gamePlaylistInfo.textContent,
   }));
-  location.href = 'winner.html';
+  // Small delay so socket can flush the final state to players before navigation
+  setTimeout(() => { location.href = 'winner.html'; }, 400);
 }
 
 function resetGame() {
-  sessionStorage.removeItem('hitster_room_code');   // fresh code next game
+  sessionStorage.removeItem('hitster_room_code');
   location.href = '/';
 }
 
 function endGame() {
   dom.endGameConfirm.classList.add('hidden');
-  const maxCards     = Math.max(...state.teams.map(t => t.cards.length));
+  const maxCards      = Math.max(...state.teams.map(t => t.cards.length));
   const winnerIndices = state.teams
     .map((t, i) => ({ t, i }))
     .filter(({ t }) => t.cards.length === maxCards)
     .map(({ i }) => i);
+  state.phase = 'finished';
+  emitState({ winnerIndices });
   sessionStorage.setItem('hitster_winner', JSON.stringify({
     teams:         state.teams,
     winnerIndices,
@@ -1290,7 +1293,7 @@ function endGame() {
     hardModeAll:   state.hardModeAll,
     playlistName:  dom.gamePlaylistInfo.textContent,
   }));
-  location.href = 'winner.html';
+  setTimeout(() => { location.href = 'winner.html'; }, 400);
 }
 
 function restartGame(mode) {
