@@ -223,9 +223,11 @@ function renderRevealedPanel(snap, isMyTurn) {
   const card   = snap.card;
   const result = snap.result;
   if (!card) return '';
-  const yr    = (card.yearUncertain ? '~' : '') + card.year;
-  const color = getDecadeVibe(card.year).color;
-  let html = h('div', 'p-card',
+  const yr      = (card.yearUncertain ? '~' : '') + card.year;
+  const color   = getDecadeVibe(card.year).color;
+  const isWrong = result && !result.correct;
+
+  let html = h('div', 'p-card' + (isWrong ? ' p-card--wrong' : ''),
     h('div', 'p-card-reveal',
       (card.albumArt ? '<img class="p-card-art" src="' + esc(card.albumArt) + '" alt="">' : '') +
       h('div', 'p-card-year', yr) +
