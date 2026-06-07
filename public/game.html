@@ -24,6 +24,7 @@
         <div id="room-panel" class="room-panel hidden">
           <span id="room-code" class="room-code"></span>
           <span id="player-count" class="player-count">0 players</span>
+          <img id="header-qr" class="header-qr hidden" src="" alt="QR" title="Tap to enlarge">
         </div>
         <div id="qr-overlay" class="qr-overlay hidden">
           <div class="qr-card">
@@ -171,8 +172,9 @@
         <h2 class="starting-title">🃏 Starting Cards Dealt!</h2>
         <p class="starting-sub">Each team begins with one card on their timeline.</p>
         <p id="starting-join-hint" class="starting-join-hint hidden">
-          📱 Scan <strong id="starting-hint-code"></strong> to join — players can still join mid-game
+          📱 Scan to join — room <strong id="starting-hint-code"></strong>
         </p>
+        <img id="starting-qr" class="starting-qr hidden" src="" alt="Scan to join">
         <div id="starting-cards-grid" class="starting-cards-grid"></div>
         <button id="btn-lets-play" class="btn-primary btn-large">Let's Play!</button>
       </div>

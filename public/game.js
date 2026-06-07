@@ -313,27 +313,6 @@ function showStartingCards() {
   dom.startingOverlay.classList.remove('hidden');
   dom.btnLetsPlay.onclick = () => {
     dom.startingOverlay.classList.add('hidden');
-    // If multiplayer room is active, show QR first so players can scan
-    if (_roomCode) {
-      const overlay  = $('qr-overlay');
-      const img      = $('qr-img');
-      const urlEl    = $('qr-url');
-      const closeBtn = $('btn-qr-close');
-      if (overlay) {
-        const joinUrl = location.origin + '/player?room=' + _roomCode;
-        if (urlEl) urlEl.textContent = joinUrl;
-        if (img)   img.src = 'https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=' + encodeURIComponent(joinUrl);
-        if (closeBtn) {
-          closeBtn.textContent = "▶ Let's Play!";
-          closeBtn.addEventListener('click', () => {
-            closeBtn.textContent = 'Close';
-            enterPreTurn();
-          }, { once: true });
-        }
-        overlay.classList.remove('hidden');
-        return;   // enterPreTurn() fires when player closes the QR
-      }
-    }
     enterPreTurn();
   };
 }
@@ -492,6 +471,13 @@ function _showRoomPanel(code) {
   if (!dom.roomPanel || !dom.roomCode) return;
   dom.roomCode.textContent = code;
   dom.roomPanel.classList.remove('hidden');
+  // Populate the small header QR thumbnail
+  const headerQr = $('header-qr');
+  if (headerQr) {
+    headerQr.src = 'https://api.qrserver.com/v1/create-qr-code/?size=56x56&data='
+      + encodeURIComponent(location.origin + '/player?room=' + code);
+    headerQr.classList.remove('hidden');
+  }
 }
 
 function _updatePlayerCount(n) {
@@ -500,10 +486,16 @@ function _updatePlayerCount(n) {
 }
 
 function _updateStartingJoinHint(code) {
-  const hint = document.getElementById('starting-join-hint');
-  const codeEl = document.getElementById('starting-hint-code');
+  const hint    = document.getElementById('starting-join-hint');
+  const codeEl  = document.getElementById('starting-hint-code');
+  const qrEl    = document.getElementById('starting-qr');
   if (hint)   hint.classList.remove('hidden');
   if (codeEl) codeEl.textContent = code;
+  if (qrEl) {
+    qrEl.src = 'https://api.qrserver.com/v1/create-qr-code/?size=160x160&data='
+      + encodeURIComponent(location.origin + '/player?room=' + code);
+    qrEl.classList.remove('hidden');
+  }
 }
 
 // ─── QR code overlay ──────────────────────────────────────────────────────────
@@ -523,6 +515,9 @@ dom.roomCode?.addEventListener('click', () => {
 $('btn-qr-close')?.addEventListener('click', () => {
   $('qr-overlay')?.classList.add('hidden');
 });
+
+// Tapping the small header QR also opens the full overlay
+$('header-qr')?.addEventListener('click', () => dom.roomCode?.click());
 
 // ─── Phase transitions ────────────────────────────────────────────────────────
 

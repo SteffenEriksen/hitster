@@ -2313,6 +2313,20 @@ button { cursor: pointer; font-family: inherit; border: none; outline: none; }
 .room-code { font-size: 0.75rem; font-weight: 800; color: rgba(255,255,255,0.9); background: rgba(255,255,255,0.15); border-radius: 20px; padding: 3px 10px; letter-spacing: 0.08em; cursor: pointer; }
 .room-code:hover { background: rgba(255,255,255,0.25); }
 .player-count { font-size: 0.65rem; color: rgba(255,255,255,0.6); }
+.header-qr {
+  width: 44px; height: 44px;
+  border-radius: 6px; cursor: pointer;
+  opacity: 0.85; flex-shrink: 0;
+  transition: opacity 0.15s, transform 0.1s;
+}
+.header-qr:hover { opacity: 1; transform: scale(1.08); }
+
+/* Starting overlay QR */
+.starting-qr {
+  width: 160px; height: 160px;
+  border-radius: 10px;
+  display: block; margin: 0 auto;
+}
 
 /* ─── QR overlay ──────────────────────────────────────────────────────────── */
 .qr-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.7); display: flex; align-items: center; justify-content: center; z-index: 300; }
