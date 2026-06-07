@@ -478,6 +478,13 @@ function _updatePlayerCount(n) {
   dom.playerCount.textContent = n + (n === 1 ? ' player' : ' players');
 }
 
+function _updateStartingJoinHint(code) {
+  const hint = document.getElementById('starting-join-hint');
+  const codeEl = document.getElementById('starting-hint-code');
+  if (hint)   hint.classList.remove('hidden');
+  if (codeEl) codeEl.textContent = code;
+}
+
 // ─── QR code overlay ──────────────────────────────────────────────────────────
 
 dom.roomCode?.addEventListener('click', () => {
@@ -1107,6 +1114,7 @@ function showWinnerScreen(winnerIndices) {
 }
 
 function resetGame() {
+  sessionStorage.removeItem('hitster_room_code');   // fresh code next game
   location.href = '/';
 }
 
@@ -1426,12 +1434,34 @@ dom.progressBarWrap.addEventListener('click', async (e) => {
     _io = io();
 
     _io.on('connect', () => {
-      _io.emit('host:create_room');
+      const savedCode = sessionStorage.getItem('hitster_room_code');
+      if (savedCode) {
+        _io.emit('host:rejoin_room', { code: savedCode });
+      } else {
+        _io.emit('host:create_room');
+      }
     });
 
     _io.on('room:created', ({ code }) => {
       _roomCode = code;
+      sessionStorage.setItem('hitster_room_code', code);
       _showRoomPanel(code);
+      _updateStartingJoinHint(code);
+    });
+
+    _io.on('room:rejoined', ({ code, players }) => {
+      _roomCode = code;
+      sessionStorage.setItem('hitster_room_code', code);
+      _showRoomPanel(code);
+      _updatePlayerCount(players.length);
+      _updateStartingJoinHint(code);
+      emitState();   // re-broadcast current state to any players still in the room
+    });
+
+    _io.on('room:rejoin_failed', () => {
+      // Room expired (server restarted, etc.) — create a fresh one
+      sessionStorage.removeItem('hitster_room_code');
+      _io.emit('host:create_room');
     });
 
     _io.on('room:players_updated', ({ players }) => {

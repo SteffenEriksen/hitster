@@ -906,9 +906,14 @@ io.on('connection', (socket) => {
       const room = rooms.get(socket.data.code);
       if (room) {
         if (room.hostSocketId === socket.id) {
-          socket.to('room:' + room.code).emit('room:host_left');
-          rooms.delete(room.code);
-          console.log('[room] deleted', room.code, '(host disconnected)');
+          // Give the host 60 s to reconnect (page refresh / in-game restart)
+          // before telling players they're gone and deleting the room.
+          room._hostGraceTimer = setTimeout(() => {
+            socket.to('room:' + room.code).emit('room:host_left');
+            rooms.delete(room.code);
+            console.log('[room] deleted', room.code, '(host did not reconnect in time)');
+          }, 60000);
+          console.log('[room]', room.code, 'host disconnected — 60 s grace started');
         } else {
           room.players = room.players.filter(p => p.socketId !== socket.id);
           io.to('room:' + room.code).emit('room:players_updated', { players: room.players });
@@ -919,12 +924,38 @@ io.on('connection', (socket) => {
       // Host socket may not carry socket.data — scan all rooms
       for (const [code, room] of rooms) {
         if (room.hostSocketId === socket.id) {
-          socket.to('room:' + code).emit('room:host_left');
-          rooms.delete(code);
-          console.log('[room] deleted', code, '(host disconnected, no data)');
+          room._hostGraceTimer = setTimeout(() => {
+            socket.to('room:' + code).emit('room:host_left');
+            rooms.delete(code);
+            console.log('[room] deleted', code, '(host did not reconnect, no data)');
+          }, 60000);
+          console.log('[room]', code, 'host disconnected (no data) — 60 s grace started');
           break;
         }
       }
+    }
+  });
+
+  // Host rejoins with existing room code (page refresh / in-game restart)
+  socket.on('host:rejoin_room', ({ code }) => {
+    const roomCode = (code || '').toUpperCase();
+    const room     = rooms.get(roomCode);
+    if (room) {
+      // Cancel grace timer — host is back
+      if (room._hostGraceTimer) { clearTimeout(room._hostGraceTimer); room._hostGraceTimer = null; }
+      room.hostSocketId = socket.id;
+      socket.data = { code: roomCode };
+      socket.join('room:' + roomCode);
+      socket.emit('room:rejoined', { code: roomCode, players: room.players });
+      // Push latest game state to all players still in the room
+      if (room.lastSnapshot) {
+        socket.to('room:' + roomCode).emit('game:state', { snapshot: room.lastSnapshot });
+      }
+      console.log('[room] host rejoined', roomCode, `(${room.players.length} players still connected)`);
+    } else {
+      // Room expired or server restarted — host must create a new one
+      socket.emit('room:rejoin_failed', { code: roomCode });
+      console.log('[room] rejoin failed for', roomCode, '(not found)');
     }
   });
 });
