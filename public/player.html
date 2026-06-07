@@ -19,6 +19,7 @@
     .p-header { background: var(--green-dark, #004444); color: #fff; border-radius: var(--radius, 16px); padding: 16px 20px; display: flex; align-items: center; justify-content: space-between; }
     .p-header-title { font-size: 1.1rem; font-weight: 800; }
     .p-room-code { font-size: 0.75rem; font-weight: 700; background: rgba(255,255,255,0.15); border-radius: 20px; padding: 3px 10px; letter-spacing: 0.08em; }
+    .p-header > span:last-child { font-size: 0.65rem; opacity: 0.65; }
 
     /* Join form */
     .p-form { display: flex; flex-direction: column; gap: 12px; }
@@ -71,6 +72,42 @@
     /* Steal button */
     .p-steal { width: 100%; padding: 12px; font-size: 0.9rem; font-weight: 600; border-radius: var(--radius-sm, 8px); border: 2px dashed var(--grey-200); color: var(--grey-400); background: transparent; cursor: not-allowed; font-family: inherit; }
     .p-next-banner { background: var(--green, #007272); color: #fff; border-radius: 10px; padding: 10px 16px; font-size: 0.9rem; font-weight: 700; text-align: center; margin-top: 4px; }
+
+    /* Scoreboard + card decks */
+    .p-scoreboard { display: flex; flex-direction: column; gap: 10px; }
+    .p-team-deck {
+      background: var(--grey-50, #f9fafb);
+      border: 1px solid var(--grey-100, #f3f4f6);
+      border-radius: 12px;
+      padding: 10px 12px;
+    }
+    .p-team-deck--current { border-color: var(--green, #007272); background: #f0fdfa; }
+    .p-team-deck--mine    { border-color: #6366f1; background: #f5f3ff; }
+    .p-team-deck--current.p-team-deck--mine { border-color: var(--green); background: #f0fdfa; }
+    .p-deck-header { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; }
+    .p-deck-name   { font-size: 0.88rem; font-weight: 700; color: var(--grey-800); flex: 1; }
+    .p-deck-count  { font-size: 0.72rem; font-weight: 600; color: var(--grey-500); }
+    .p-deck-badge  { font-size: 0.65rem; font-weight: 700; border-radius: 20px; padding: 2px 8px; white-space: nowrap; }
+    .p-deck-badge--playing { background: var(--green, #007272); color: #fff; }
+    .p-deck-badge--me      { background: #6366f1; color: #fff; }
+    .p-deck-empty { font-size: 0.75rem; color: var(--grey-400); font-style: italic; margin: 0; }
+    .p-deck-scroll {
+      display: flex;
+      gap: 6px;
+      overflow-x: auto;
+      padding-bottom: 4px;
+    }
+    .p-deck-card {
+      flex-shrink: 0;
+      background: #fff;
+      border: 1px solid var(--grey-200, #e5e7eb);
+      border-radius: 8px;
+      padding: 6px 8px;
+      min-width: 58px;
+      text-align: center;
+    }
+    .p-deck-year  { font-size: 0.88rem; font-weight: 800; line-height: 1.2; }
+    .p-deck-title { font-size: 0.6rem; color: var(--grey-500); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 70px; }
 
     /* Status banners */
     .p-status { text-align: center; color: var(--grey-500); font-size: 0.9rem; padding: 8px 0; }

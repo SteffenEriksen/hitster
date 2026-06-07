@@ -126,13 +126,8 @@ function renderGame(snap) {
   // Header
   content += h('div', 'p-header',
     h('span', 'p-header-title', '🎵 ' + (snap.isTiebreaker ? '⚡ Sudden Death' : esc(snap.playlistName || 'Hitster'))) +
-    h('span', 'p-room-code', roomCode));
-
-  // Scores
-  content += h('div', 'p-card',
-    h('p', 'p-section-title', 'Scores') +
-    h('div', 'p-scores', renderScoreChips(snap)) +
-    h('p', 'p-waiting', snap.deckCount + ' cards left'));
+    h('span', 'p-room-code', roomCode) +
+    h('span', '', snap.deckCount + ' cards left'));
 
   // Catch-up banner
   if (!caughtUp) {
@@ -154,6 +149,11 @@ function renderGame(snap) {
     content += renderPlayingPanel(snap, isMyTurn, myCards);
   } else if (snap.phase === 'finished') {
     content += renderFinishedPanel(snap);
+  }
+
+  // Scoreboard + card decks — always shown below the action panel
+  if (snap.phase !== 'finished') {
+    content += renderScoreboardAndDecks(snap);
   }
 
   app.innerHTML = content;
@@ -254,6 +254,49 @@ function renderStealWatchingPanel(snap) {
     h('p', 'p-status', '🤚 ' + name + ' is attempting a steal…') +
     h('p', 'p-section-title', 'Their timeline') +
     renderTimeline(stealer?.cards || [], false, null));
+}
+
+function renderScoreboardAndDecks(snap) {
+  // Sort by card count descending, keep original index for highlighting
+  const sorted = snap.teams
+    .map((t, i) => ({ ...t, idx: i }))
+    .sort((a, b) => b.cards.length - a.cards.length);
+
+  const teams = sorted.map(t => {
+    const isCurrent = t.idx === snap.currentTeamIndex;
+    const isMe      = t.idx === myTeamIndex;
+    const cls       = 'p-team-deck'
+      + (isMe      ? ' p-team-deck--mine'    : '')
+      + (isCurrent ? ' p-team-deck--current' : '');
+
+    const badge = isCurrent ? h('span', 'p-deck-badge p-deck-badge--playing', '▶ Playing')
+                : isMe      ? h('span', 'p-deck-badge p-deck-badge--me',      '★ You')
+                : '';
+
+    const cards = t.cards.length === 0
+      ? h('p', 'p-deck-empty', 'No cards yet')
+      : '<div class="p-deck-scroll">' +
+          t.cards.map(c => {
+            const color = getDecadeVibe(c.year).color;
+            const yr    = (c.yearUncertain ? '~' : '') + c.year;
+            return '<div class="p-deck-card">' +
+              '<div class="p-deck-year" style="color:' + color + '">' + yr + '</div>' +
+              '<div class="p-deck-title">' + esc(c.title) + '</div>' +
+              '</div>';
+          }).join('') +
+        '</div>';
+
+    return h('div', cls,
+      h('div', 'p-deck-header',
+        h('span', 'p-deck-name', esc(t.name)) +
+        badge +
+        h('span', 'p-deck-count', t.cards.length + ' card' + (t.cards.length !== 1 ? 's' : ''))
+      ) +
+      cards
+    );
+  }).join('');
+
+  return h('div', 'p-scoreboard', teams);
 }
 
 function renderFinishedPanel(snap) {
