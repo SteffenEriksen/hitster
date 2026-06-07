@@ -1740,8 +1740,36 @@ button { cursor: pointer; font-family: inherit; border: none; outline: none; }
   background: #fff7ed;
   border-bottom: 1px solid #fed7aa;
   font-size: 0.8rem;
+  transition: background 0.2s;
+}
+/* Active state — someone has committed to steal */
+.steal-indicator--active {
+  background: #f97316;
+  border-bottom-color: #ea580c;
+  padding: 10px 20px;
+  animation: steal-pulse 1.4s ease-in-out infinite;
+}
+@keyframes steal-pulse {
+  0%, 100% { background: #f97316; }
+  50%       { background: #ea580c; }
+}
+.steal-indicator-icon { font-size: 1rem; }
+.steal-indicator-label {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #fff;
+}
+.steal-team-pill {
+  background: rgba(255,255,255,0.25);
+  color: #fff;
+  font-weight: 800;
+  font-size: 0.85rem;
+  border-radius: 20px;
+  padding: 3px 12px;
+  border: 1.5px solid rgba(255,255,255,0.5);
 }
 .steal-indicator-text { color: #c2410c; font-weight: 600; }
+.steal-indicator--active .steal-indicator-text { color: #fff; }
 .host-steal-team-btns { display: flex; gap: 6px; flex-wrap: wrap; }
 .btn-host-steal-team {
   background: transparent; border: 1.5px solid #f97316; color: #c2410c;

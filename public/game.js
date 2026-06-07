@@ -1226,10 +1226,20 @@ function _updateStealIndicator() {
   const curIdx = currentTeamIndex();
 
   if (state._stealQueue.length > 0) {
-    dom.stealIndicatorText.textContent = '🤚 Ready to steal: ' + state._stealQueue.map(s => s.name).join(', ');
+    // Teams have committed — make it unmissable
+    dom.stealIndicator.className = 'steal-indicator steal-indicator--active';
+    const names = state._stealQueue.map(s =>
+      '<span class="steal-team-pill">' + esc(s.name) + '</span>'
+    ).join('');
+    dom.stealIndicatorText.innerHTML =
+      '<span class="steal-indicator-icon">🤚</span>' +
+      '<span class="steal-indicator-label">Committed to steal:</span>' +
+      names;
     dom.hostStealTeamBtns.innerHTML = '';
   } else {
-    dom.stealIndicatorText.textContent = '🤚 Mark steal:';
+    // No commits yet — subtle with register buttons
+    dom.stealIndicator.className = 'steal-indicator';
+    dom.stealIndicatorText.innerHTML = '<span class="steal-indicator-icon">🤚</span> Mark steal for:';
     dom.hostStealTeamBtns.innerHTML = state.teams.map((t, i) => {
       if (i === curIdx) return '';
       return `<button class="btn-host-steal-team" data-team="${i}">${esc(t.name)}</button>`;
