@@ -433,13 +433,14 @@ function buildSnapshot() {
     deckCount:    state.deck.length,
     isTiebreaker: state.isTiebreaker,
     selectedSlot: state.selectedSlot,
-    card: state.currentCard ? {
-      year:         state.currentCard.year,
-      yearUncertain: !!state.currentCard.yearUncertain,
-      title:        state.currentCard.title,
-      artist:       state.currentCard.artist,
-      albumArt:     state.currentCard.albumArt || '',
-    } : null,
+    // Card is face-down during 'playing' — don't reveal title/artist/year to players
+    card: state.currentCard
+      ? state.phase === 'playing'
+        ? { faceDown: true }
+        : { year: state.currentCard.year, yearUncertain: !!state.currentCard.yearUncertain,
+            title: state.currentCard.title, artist: state.currentCard.artist,
+            albumArt: state.currentCard.albumArt || '' }
+      : null,
     result:        null,
     playlistName:  dom.gamePlaylistInfo.textContent,
     winnerIndices: null,
@@ -791,6 +792,9 @@ function finishPlacement(correct, slot, fromHardMode = false) {
     dom.resultBanner.className = 'result-banner correct';
     dom.resultText.textContent = '✓ Correct! Card added to timeline.';
     team.cards.splice(slot, 0, state.currentCard);
+    // Correct placement — clear any pre-registered steal queue
+    state._stealQueue   = [];
+    state._stealQueueIdx = 0;
   } else {
     dom.resultBanner.className = 'result-banner wrong';
     dom.resultText.textContent = '✗ Wrong! Card discarded.';
@@ -1030,16 +1034,21 @@ function slotLabel(cards, i) {
 function openStealWindow() {
   if (!state.stealEnabled) return;
   state._stealPhase   = 'available';
-  state._stealQueue   = [];
   state._stealQueueIdx = 0;
   state._stealSlot    = null;
 
-  // Hide Next Team → until steal is resolved
   dom.btnNextTeam.classList.add('hidden');
   dom.btnConfirmSteal.classList.add('hidden');
-  dom.stealSection.classList.remove('hidden');
-  _renderStealTeamBtns();
-  emitState();
+
+  if (state._stealQueue.length > 0) {
+    // Teams pre-registered — start first attempt straight away
+    startStealAttempt();
+  } else {
+    // No pre-registrations — show the steal window for teams to claim
+    dom.stealSection.classList.remove('hidden');
+    _renderStealTeamBtns();
+    emitState();
+  }
 }
 
 function _renderStealTeamBtns() {
@@ -1059,14 +1068,16 @@ function _renderStealTeamBtns() {
 }
 
 function requestSteal(teamIndex) {
-  if (state._stealPhase !== 'available') return;
+  // Allow pre-registration during 'playing' (queue for when/if placement fails)
+  // OR direct claim during 'available' phase
+  if (state._stealPhase !== 'available' && state.phase !== 'playing') return;
   if (state._stealQueue.some(s => s.teamIndex === teamIndex)) return; // already queued
   const team = state.teams[teamIndex];
   state._stealQueue.push({ teamIndex, name: team.name });
   _renderStealTeamBtns();
   emitState();
-  // If first in queue, start their attempt immediately
-  if (state._stealQueue.length === 1) startStealAttempt();
+  // Only auto-start if steal window is already open (placement already failed)
+  if (state._stealPhase === 'available' && state._stealQueue.length === 1) startStealAttempt();
 }
 
 function startStealAttempt() {
@@ -1117,8 +1128,8 @@ function confirmSteal() {
     dom.resultBanner.className = 'result-banner correct';
     dom.resultText.textContent = '🤚 Steal! ' + stealer.name + ' takes the card!';
   } else {
-    // Lose last card
-    if (stealTeam.cards.length > 0) stealTeam.cards.pop();
+    // Lose last card — but protect the initial (first) card; minimum 1 card
+    if (stealTeam.cards.length > 1) stealTeam.cards.pop();
     dom.resultBanner.className = 'result-banner wrong';
     dom.resultText.textContent = '✗ Steal failed! ' + stealer.name + ' loses a card.';
   }

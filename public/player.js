@@ -141,7 +141,7 @@ function renderGame(snap) {
     content += renderStealPlacingPanel(snap);
   } else if (snap.stealPhase === 'placing') {
     content += renderStealWatchingPanel(snap);
-  } else if (snap.phase === 'revealed' || !caughtUp) {
+  } else if (snap.phase === 'revealed') {
     content += renderRevealedPanel(snap, isMyTurn);
   } else if (snap.phase === 'pre-turn') {
     content += renderPreTurnPanel(snap, isMyTurn, myCards);
@@ -186,17 +186,30 @@ function renderPlayingPanel(snap, isMyTurn, myCards) {
         : h('p', 'p-waiting', 'Tap a + to place the card')));
   }
   // Other team's turn
-  const stealAvailable = snap.stealPhase === 'available';
-  const alreadyQueued  = stealAvailable && (snap.stealQueue || []).some(s => s.teamIndex === myTeamIndex);
-  const queuePos       = stealAvailable && (snap.stealQueue || []).findIndex(s => s.teamIndex === myTeamIndex);
-  let stealBtn;
-  if (stealAvailable && !alreadyQueued) {
+  const stealAvailable    = snap.stealPhase === 'available';
+  const alreadyQueued     = (snap.stealQueue || []).some(s => s.teamIndex === myTeamIndex);
+  const queuePos          = (snap.stealQueue || []).findIndex(s => s.teamIndex === myTeamIndex);
+
+  let stealBtn = '';
+  if (alreadyQueued) {
+    stealBtn = h('div', 'p-steal-committed',
+      '🤚 Committed to steal' + (queuePos >= 0 ? ' — #' + (queuePos + 1) + ' in line' : '') + '!');
+  } else if (stealAvailable) {
+    // Steal window is open — show claim button
     stealBtn = '<button id="p-steal-btn" class="p-btn" style="background:#e85d04;margin-top:8px">🤚 Steal!</button>';
-  } else if (stealAvailable && alreadyQueued) {
-    stealBtn = h('p', 'p-status', '🤚 You are #' + (queuePos + 1) + ' in the steal queue');
-  } else {
-    stealBtn = '<button class="p-steal" disabled title="Steal is ' + (snap.stealEnabled ? 'not available yet' : 'disabled') + '">🔒 Steal</button>';
+  } else if (snap.stealEnabled) {
+    // Pre-registration: commit intent before placement happens
+    stealBtn =
+      '<button id="p-presteal-btn" class="p-btn-steal-pre" style="margin-top:8px">🤚 Commit to Steal</button>' +
+      '<div id="p-presteal-confirm" class="p-presteal-confirm hidden">' +
+        '<p style="font-size:0.82rem;color:#6b7280;margin:0">If they fail, you\'ll attempt to place the card. Fail and you lose your last card.</p>' +
+        '<div style="display:flex;gap:8px;margin-top:8px">' +
+          '<button id="p-presteal-yes" class="p-btn" style="background:#e85d04;flex:1">Yes, commit!</button>' +
+          '<button id="p-presteal-no" class="p-btn p-btn-ghost" style="flex:1">Cancel</button>' +
+        '</div>' +
+      '</div>';
   }
+
   return h('div', 'p-card',
     (stealAvailable
       ? h('p', 'p-status', '🤚 Steal available! ' + esc(snap.currentTeamName) + ' failed.')
@@ -350,7 +363,24 @@ function attachNextTeamListener() {
 }
 
 function attachStealListeners(snap) {
-  // Steal claim button
+  // Pre-commit steal (during playing phase, before placement)
+  const preStealBtn = document.getElementById('p-presteal-btn');
+  if (preStealBtn) {
+    preStealBtn.addEventListener('click', () => {
+      preStealBtn.classList.add('hidden');
+      document.getElementById('p-presteal-confirm')?.classList.remove('hidden');
+    });
+  }
+  document.getElementById('p-presteal-yes')?.addEventListener('click', () => {
+    document.getElementById('p-presteal-yes').disabled = true;
+    socket.emit('player:steal_request', { code: roomCode });
+  });
+  document.getElementById('p-presteal-no')?.addEventListener('click', () => {
+    document.getElementById('p-presteal-confirm')?.classList.add('hidden');
+    document.getElementById('p-presteal-btn')?.classList.remove('hidden');
+  });
+
+  // Direct steal claim (during steal-available phase)
   const stealBtn = document.getElementById('p-steal-btn');
   if (stealBtn) {
     stealBtn.addEventListener('click', () => {
@@ -412,9 +442,11 @@ function initSocket() {
     joined = true;
     latestSnap = snapshot;
     if (snapshot && snapshot.phase && snapshot.phase !== 'pre-turn') {
-      caughtUp = false;
+      // Only mark as catching-up if there's a reveal to catch (don't leak card during 'playing')
+      caughtUp = snapshot.phase !== 'revealed';
       renderGame(snapshot);
     } else {
+      caughtUp = true;
       renderLobby(players);
     }
   });
