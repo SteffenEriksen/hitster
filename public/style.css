@@ -2309,10 +2309,53 @@ button { cursor: pointer; font-family: inherit; border: none; outline: none; }
 ::-webkit-scrollbar-thumb:hover { background: var(--grey-300); }
 
 /* ─── Room panel ──────────────────────────────────────────────────────────── */
-.room-panel { display: flex; align-items: center; gap: 6px; }
+.room-panel { display: flex; align-items: center; gap: 6px; position: relative; }
 .room-code { font-size: 0.75rem; font-weight: 800; color: rgba(255,255,255,0.9); background: rgba(255,255,255,0.15); border-radius: 20px; padding: 3px 10px; letter-spacing: 0.08em; cursor: pointer; }
 .room-code:hover { background: rgba(255,255,255,0.25); }
-.player-count { font-size: 0.65rem; color: rgba(255,255,255,0.6); }
+.player-count-btn {
+  font-size: 0.65rem; font-family: inherit; font-weight: 600;
+  color: rgba(255,255,255,0.75); background: rgba(255,255,255,0.1);
+  border: 1px solid rgba(255,255,255,0.2); border-radius: 20px;
+  padding: 2px 8px; cursor: pointer; transition: background 0.12s;
+}
+.player-count-btn:hover { background: rgba(255,255,255,0.2); color: #fff; }
+.player-list-panel {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  min-width: 200px;
+  background: #fff;
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+  padding: 10px;
+  z-index: 250;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.plp-empty { font-size: 0.78rem; color: var(--grey-400); text-align: center; padding: 4px 0; margin: 0; }
+.plp-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 4px 2px; border-bottom: 1px solid var(--grey-100); }
+.plp-row:last-child { border-bottom: none; }
+.plp-name { font-size: 0.82rem; font-weight: 600; color: var(--grey-800); }
+.plp-team { font-size: 0.72rem; color: var(--grey-500); }
+
+/* Starting overlay player list */
+.room-players-list {
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 10px;
+  padding: 10px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 220px;
+}
+.rpl-header { font-size: 0.78rem; font-weight: 700; color: var(--green-dark); margin-bottom: 4px; }
+.rpl-empty  { font-size: 0.78rem; color: var(--grey-400); text-align: center; margin: 0; }
+.rpl-row    { display: flex; align-items: center; gap: 6px; }
+.rpl-dot    { font-size: 0.5rem; color: var(--green); flex-shrink: 0; }
+.rpl-name   { font-size: 0.82rem; font-weight: 600; color: var(--grey-800); flex: 1; }
+.rpl-team   { font-size: 0.72rem; color: var(--grey-500); }
 .header-qr {
   width: 44px; height: 44px;
   border-radius: 6px; cursor: pointer;

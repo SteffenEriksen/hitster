@@ -23,9 +23,11 @@
         <span id="tb-badge" class="tb-badge hidden">⚡ SUDDEN DEATH</span>
         <div id="room-panel" class="room-panel hidden">
           <span id="room-code" class="room-code"></span>
-          <span id="player-count" class="player-count">0 players</span>
+          <button id="player-count" class="player-count-btn">0 players</button>
           <img id="header-qr" class="header-qr hidden" src="" alt="QR" title="Tap to enlarge">
         </div>
+        <!-- Player list popup (shown when player count is tapped) -->
+        <div id="player-list-panel" class="player-list-panel hidden"></div>
         <div id="qr-overlay" class="qr-overlay hidden">
           <div class="qr-card">
             <p class="qr-title">Scan to join</p>
@@ -175,6 +177,7 @@
           📱 Scan to join — room <strong id="starting-hint-code"></strong>
         </p>
         <img id="starting-qr" class="starting-qr hidden" src="" alt="Scan to join">
+        <div id="room-players-list" class="room-players-list hidden"></div>
         <div id="starting-cards-grid" class="starting-cards-grid"></div>
         <button id="btn-lets-play" class="btn-primary btn-large">Let's Play!</button>
       </div>

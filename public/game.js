@@ -14,6 +14,7 @@ const dom = {
   roomPanel:          $('room-panel'),
   roomCode:           $('room-code'),
   playerCount:        $('player-count'),
+  playerListPanel:    $('player-list-panel'),
   matchPointBanner:   $('match-point-banner'),
   hardModeBadge:      $('hard-mode-badge'),
   // Game settings overlay
@@ -147,8 +148,9 @@ const state = {
 
 // ─── Multiplayer state ────────────────────────────────────────────────────────
 
-let _roomCode = null;
-let _io = null;
+let _roomCode    = null;
+let _io          = null;
+let _roomPlayers = [];   // [{ socketId, name, teamIndex }]
 
 // ─── Playback error helpers ───────────────────────────────────────────────────
 
@@ -480,9 +482,47 @@ function _showRoomPanel(code) {
   }
 }
 
-function _updatePlayerCount(n) {
+function _updatePlayerCount(players) {
+  _roomPlayers = Array.isArray(players) ? players : [];
+  const n = _roomPlayers.length;
   if (!dom.playerCount) return;
   dom.playerCount.textContent = n + (n === 1 ? ' player' : ' players');
+  _renderPlayerList();
+}
+
+function _renderPlayerList() {
+  // Starting overlay list
+  const startList = document.getElementById('room-players-list');
+  if (startList) {
+    if (_roomPlayers.length === 0) {
+      startList.innerHTML = '<p class="rpl-empty">No players have joined yet</p>';
+      startList.classList.remove('hidden');
+    } else {
+      startList.innerHTML =
+        '<div class="rpl-header">👥 ' + _roomPlayers.length + ' player' + (_roomPlayers.length !== 1 ? 's' : '') + ' joined</div>' +
+        _roomPlayers.map(p => {
+          const teamName = state.teams[p.teamIndex]?.name || ('Team ' + (p.teamIndex + 1));
+          return '<div class="rpl-row">' +
+            '<span class="rpl-dot">●</span>' +
+            '<span class="rpl-name">' + esc(p.name) + '</span>' +
+            '<span class="rpl-team">' + esc(teamName) + '</span>' +
+            '</div>';
+        }).join('');
+      startList.classList.remove('hidden');
+    }
+  }
+  // Header popup panel
+  if (dom.playerListPanel) {
+    dom.playerListPanel.innerHTML = _roomPlayers.length === 0
+      ? '<p class="plp-empty">No players yet</p>'
+      : _roomPlayers.map(p => {
+          const teamName = state.teams[p.teamIndex]?.name || ('Team ' + (p.teamIndex + 1));
+          return '<div class="plp-row">' +
+            '<span class="plp-name">' + esc(p.name) + '</span>' +
+            '<span class="plp-team">' + esc(teamName) + '</span>' +
+            '</div>';
+        }).join('');
+  }
 }
 
 function _updateStartingJoinHint(code) {
@@ -518,6 +558,15 @@ $('btn-qr-close')?.addEventListener('click', () => {
 
 // Tapping the small header QR also opens the full overlay
 $('header-qr')?.addEventListener('click', () => dom.roomCode?.click());
+
+// Player count button toggles the player list panel
+dom.playerCount?.addEventListener('click', (e) => {
+  e.stopPropagation();
+  dom.playerListPanel?.classList.toggle('hidden');
+});
+document.addEventListener('click', () => {
+  dom.playerListPanel?.classList.add('hidden');
+});
 
 // ─── Phase transitions ────────────────────────────────────────────────────────
 
@@ -1469,7 +1518,7 @@ dom.progressBarWrap.addEventListener('click', async (e) => {
       _roomCode = code;
       sessionStorage.setItem('hitster_room_code', code);
       _showRoomPanel(code);
-      _updatePlayerCount(players.length);
+      _updatePlayerCount(players);
       _updateStartingJoinHint(code);
       emitState();   // re-broadcast current state to any players still in the room
     });
@@ -1481,7 +1530,7 @@ dom.progressBarWrap.addEventListener('click', async (e) => {
     });
 
     _io.on('room:players_updated', ({ players }) => {
-      _updatePlayerCount(players.length);
+      _updatePlayerCount(players);
     });
 
     _io.on('player:slot_selected', ({ slotIndex }) => {
