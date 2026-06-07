@@ -464,6 +464,7 @@ async function startGame() {
     const cardsToWin    = parseInt(dom.cardsDisplay.textContent) || 8;
     const hardModeFinal = $('toggle-hard-final').checked;
     const hardModeAll   = $('toggle-hard-all').checked;
+    const stealEnabled  = $('toggle-steal')?.checked || false;
 
     // Build shuffled deck and deal one starter card to each team
     const deck = shuffle([...allTracks]);
@@ -484,6 +485,7 @@ async function startGame() {
       cardsToWin,
       hardModeFinal,
       hardModeAll,
+      stealEnabled,
       allTracks,
       deck,
       activeTeams:   teams.map((_, i) => i),

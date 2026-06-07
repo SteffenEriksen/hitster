@@ -24,6 +24,7 @@ const dom = {
   gsCardsDisplay:     $('gs-cards-display'),
   gsHardFinal:        $('gs-hard-final'),
   gsHardAll:          $('gs-hard-all'),
+  gsSteal:            $('gs-steal'),
   gsHardNote:         $('gs-hard-note'),
   btnGsApply:         $('btn-gs-apply'),
   btnGsCancel:        $('btn-gs-cancel'),
@@ -87,6 +88,7 @@ const dom = {
   // Footer
   btnStartTurn: $('btn-start-turn'),
   btnConfirm:   $('btn-confirm'),
+  btnConfirmSteal: $('btn-confirm-steal'),
   btnNextTeam:  $('btn-next-team'),
   // Year correction
   yearEditSection: $('year-edit-section'),
@@ -107,6 +109,10 @@ const dom = {
   btnRestartCancel:    $('btn-restart-cancel'),
   restartFullCount:    $('restart-full-count'),
   restartRemainingCount: $('restart-remaining-count'),
+  // Steal
+  stealSection:   $('steal-section'),
+  stealTeamBtns:  $('steal-team-btns'),
+  btnSkipSteal:   $('btn-skip-steal'),
 };
 
 // ─── Game state ───────────────────────────────────────────────────────────────
@@ -131,6 +137,12 @@ const state = {
   _currentYearPromise: null,
   _hardModePending: false,
   _hardModeDisablePending: false,
+  // Steal
+  stealEnabled:   false,
+  _stealPhase:    null,   // null | 'available' | 'placing' | 'result'
+  _stealQueue:    [],     // [{ teamIndex, name }] ordered by claim time
+  _stealQueueIdx: 0,      // index of current stealer in queue
+  _stealSlot:     null,   // slot selected by current stealer
 };
 
 // ─── Multiplayer state ────────────────────────────────────────────────────────
@@ -339,6 +351,7 @@ function openGameSettings() {
   dom.gsCardsDisplay.textContent  = _gsCardsToWin;
   dom.gsHardFinal.checked         = state.hardModeFinal;
   dom.gsHardAll.checked           = state.hardModeAll || state._hardModePending;
+  dom.gsSteal.checked             = state.stealEnabled;
   dom.gsHardNote.classList.add('hidden');
   _updateGsCardsButtons();
   dom.gameSettingsOverlay.classList.remove('hidden');
@@ -380,6 +393,9 @@ function applyGameSettings() {
       state._hardModePending        = false;
     }
   }
+
+  // Steal — immediate effect
+  state.stealEnabled = dom.gsSteal.checked;
 
   syncHardModeCtl();
   dom.gameSettingsOverlay.classList.add('hidden');
@@ -425,6 +441,21 @@ function buildSnapshot() {
     result:        null,
     playlistName:  dom.gamePlaylistInfo.textContent,
     winnerIndices: null,
+    stealEnabled:  state.stealEnabled,
+    stealPhase:    state._stealPhase,
+    stealQueue:    state._stealQueue.map((s, idx) => ({
+      teamIndex: s.teamIndex,
+      name:      s.name,
+      isCurrent: idx === state._stealQueueIdx,
+    })),
+    currentStealer: state._stealQueue[state._stealQueueIdx]
+      ? { teamIndex: state._stealQueue[state._stealQueueIdx].teamIndex,
+          stealSlot: state._stealSlot,
+          cards:     state.teams[state._stealQueue[state._stealQueueIdx].teamIndex].cards.map(c => ({
+            year: c.year, yearUncertain: !!c.yearUncertain, title: c.title, artist: c.artist,
+          })),
+        }
+      : null,
   };
 }
 
@@ -494,6 +525,9 @@ function enterPreTurn() {
   dom.overturnConfirm.classList.add('hidden');
   dom.yearEditSection.classList.add('hidden');
   dom.btnEditYear.classList.add('hidden');
+  dom.stealSection.classList.add('hidden');
+  dom.btnConfirmSteal.classList.add('hidden');
+  closeStealWindow();
   hidePlaybackError();
   dom.suddenDeathOverlay.classList.add('hidden');
 
@@ -714,6 +748,9 @@ function finishPlacement(correct, slot, fromHardMode = false) {
     setTimeout(() => {
       if (state._skipToWin && state.phase === 'revealed') nextTeam();
     }, 3000);
+  } else if (!correct && state.stealEnabled && state.teams.length > 1) {
+    // Open steal window; "Next Team →" appears only after steal resolves or is skipped
+    openStealWindow();
   } else {
     dom.btnNextTeam.textContent = 'Next Team →';
     dom.btnNextTeam.classList.remove('hidden');
@@ -848,10 +885,11 @@ function checkWinCondition() {
 
 // ─── Timeline rendering ───────────────────────────────────────────────────────
 
-function renderTimeline(interactive) {
-  const team     = currentTeam();
-  const cards    = team.cards;
-  const timeline = dom.timeline;
+function renderTimeline(interactive, overrideCards, overrideSlot, onSlotClick) {
+  const cards        = overrideCards   !== undefined ? overrideCards   : currentTeam().cards;
+  const selectedSlot = overrideSlot    !== undefined ? overrideSlot    : state.selectedSlot;
+  const slotClick    = onSlotClick     || selectSlot;
+  const timeline     = dom.timeline;
   timeline.innerHTML = '';
 
   if (cards.length === 0 && !interactive) {
@@ -870,14 +908,14 @@ function renderTimeline(interactive) {
     const slot = document.createElement('div');
     slot.className = 'timeline-slot';
     if (interactive) {
-      if (state.selectedSlot === i) slot.classList.add('selected');
+      if (selectedSlot === i) slot.classList.add('selected');
       const btn = document.createElement('button');
       btn.className = 'slot-btn';
       btn.textContent = '+';
       btn.setAttribute('aria-label', slotLabel(cards, i));
-      btn.addEventListener('click', () => selectSlot(i));
+      btn.addEventListener('click', () => slotClick(i));
       slot.appendChild(btn);
-      slot.addEventListener('click', () => selectSlot(i));
+      slot.addEventListener('click', () => slotClick(i));
     } else {
       const dot = document.createElement('div');
       dot.style.cssText = 'width:2px;height:40px;background:var(--grey-100);border-radius:1px;margin:auto';
@@ -902,7 +940,7 @@ function renderTimeline(interactive) {
 
   timeline.appendChild(row);
 
-  if (interactive && state.selectedSlot !== null) {
+  if (interactive && selectedSlot !== null) {
     const selected = row.querySelector('.timeline-slot.selected');
     if (selected) selected.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
   }
@@ -913,6 +951,141 @@ function slotLabel(cards, i) {
   if (i === 0)               return 'Before ' + cards[0].year;
   if (i === cards.length)    return 'After '  + cards[cards.length - 1].year;
   return 'Between ' + cards[i - 1].year + ' and ' + cards[i].year;
+}
+
+// ─── Steal ────────────────────────────────────────────────────────────────────
+
+function openStealWindow() {
+  if (!state.stealEnabled) return;
+  state._stealPhase   = 'available';
+  state._stealQueue   = [];
+  state._stealQueueIdx = 0;
+  state._stealSlot    = null;
+
+  // Hide Next Team → until steal is resolved
+  dom.btnNextTeam.classList.add('hidden');
+  dom.btnConfirmSteal.classList.add('hidden');
+  dom.stealSection.classList.remove('hidden');
+  _renderStealTeamBtns();
+  emitState();
+}
+
+function _renderStealTeamBtns() {
+  const curIdx = currentTeamIndex();
+  dom.stealTeamBtns.innerHTML = state.teams.map((t, i) => {
+    if (i === curIdx) return '';
+    const inQueue = state._stealQueue.some(s => s.teamIndex === i);
+    const isCurrent = state._stealQueueIdx < state._stealQueue.length &&
+                      state._stealQueue[state._stealQueueIdx].teamIndex === i;
+    return `<button class="btn-steal-team${inQueue ? ' queued' : ''}" data-team="${i}"${inQueue ? ' disabled' : ''}>` +
+      esc(t.name) + (inQueue ? (isCurrent ? ' ▶' : ' #' + (state._stealQueue.findIndex(s => s.teamIndex === i) + 1)) : '') +
+      `</button>`;
+  }).join('');
+  dom.stealTeamBtns.querySelectorAll('.btn-steal-team:not([disabled])').forEach(btn => {
+    btn.addEventListener('click', () => requestSteal(parseInt(btn.dataset.team, 10)));
+  });
+}
+
+function requestSteal(teamIndex) {
+  if (state._stealPhase !== 'available') return;
+  if (state._stealQueue.some(s => s.teamIndex === teamIndex)) return; // already queued
+  const team = state.teams[teamIndex];
+  state._stealQueue.push({ teamIndex, name: team.name });
+  _renderStealTeamBtns();
+  emitState();
+  // If first in queue, start their attempt immediately
+  if (state._stealQueue.length === 1) startStealAttempt();
+}
+
+function startStealAttempt() {
+  const stealer = state._stealQueue[state._stealQueueIdx];
+  if (!stealer) { closeStealWindow(); return; }
+  state._stealPhase = 'placing';
+  state._stealSlot  = null;
+
+  // Update the team label area to show the stealer
+  dom.currentTeamName.textContent = '🤚 ' + stealer.name;
+  dom.stealSection.classList.add('hidden');
+  dom.btnConfirmSteal.classList.add('hidden');
+
+  // Show stealing team's timeline with slot buttons
+  renderTimeline(true, state.teams[stealer.teamIndex].cards, null, selectStealSlot);
+  renderOtherTeams();
+  emitState();
+}
+
+function selectStealSlot(idx) {
+  if (state._stealPhase !== 'placing') return;
+  state._stealSlot = idx;
+  const stealer = state._stealQueue[state._stealQueueIdx];
+  renderTimeline(true, state.teams[stealer.teamIndex].cards, idx, selectStealSlot);
+  dom.btnConfirmSteal.classList.remove('hidden');
+  emitState();
+}
+
+function confirmSteal() {
+  const stealer = state._stealQueue[state._stealQueueIdx];
+  if (!stealer || state._stealSlot === null) return;
+
+  const stealTeam = state.teams[stealer.teamIndex];
+  const cards     = stealTeam.cards;
+  const slot      = state._stealSlot;
+  const year      = state.currentCard.year;
+
+  const leftOk  = slot === 0 || cards[slot - 1].year <= year;
+  const rightOk = slot >= cards.length || cards[slot].year >= year;
+  const correct = leftOk && rightOk;
+
+  state._stealPhase = 'result';
+  dom.btnConfirmSteal.classList.add('hidden');
+
+  if (correct) {
+    stealTeam.cards.splice(slot, 0, state.currentCard);
+    dom.resultBanner.className = 'result-banner correct';
+    dom.resultText.textContent = '🤚 Steal! ' + stealer.name + ' takes the card!';
+  } else {
+    // Lose last card
+    if (stealTeam.cards.length > 0) stealTeam.cards.pop();
+    dom.resultBanner.className = 'result-banner wrong';
+    dom.resultText.textContent = '✗ Steal failed! ' + stealer.name + ' loses a card.';
+  }
+
+  dom.resultBanner.classList.remove('hidden');
+  // Show correct team's cards in the timeline after steal
+  renderTimeline(false, stealTeam.cards, null, null);
+  renderOtherTeams();
+  renderScoreChips();
+
+  emitState({ result: { correct, text: dom.resultText.textContent } });
+
+  if (correct) {
+    // Steal succeeded — advance normally after a beat
+    dom.btnNextTeam.textContent = 'Next Team →';
+    dom.btnNextTeam.classList.remove('hidden');
+    closeStealWindow();
+  } else {
+    // Move to next stealer or end
+    state._stealQueueIdx++;
+    if (state._stealQueueIdx < state._stealQueue.length) {
+      // There's another team in the queue — show "next steal" button
+      dom.btnNextTeam.textContent = '🤚 Next steal →';
+      dom.btnNextTeam.classList.remove('hidden');
+    } else {
+      // No more stealers
+      dom.btnNextTeam.textContent = 'Next Team →';
+      dom.btnNextTeam.classList.remove('hidden');
+      closeStealWindow();
+    }
+  }
+}
+
+function closeStealWindow() {
+  state._stealPhase   = null;
+  state._stealQueue   = [];
+  state._stealQueueIdx = 0;
+  state._stealSlot    = null;
+  dom.stealSection.classList.add('hidden');
+  dom.btnConfirmSteal.classList.add('hidden');
 }
 
 // ─── Winner screen (navigate to winner.html) ──────────────────────────────────
@@ -1010,7 +1183,15 @@ dom.btnDiscardNo.addEventListener('click', () => {
   dom.btnDiscard.classList.remove('hidden');
 });
 
-dom.btnNextTeam.addEventListener('click', nextTeam);
+dom.btnNextTeam.addEventListener('click', () => {
+  if (state._stealPhase === 'result' && state._stealQueueIdx < state._stealQueue.length) {
+    // Another team in the steal queue — start their attempt
+    dom.btnNextTeam.classList.add('hidden');
+    startStealAttempt();
+  } else {
+    nextTeam();
+  }
+});
 
 dom.btnHcSubmit.addEventListener('click', () => {
   const slot     = state.selectedSlot;
@@ -1067,6 +1248,15 @@ dom.btnYearDismiss.addEventListener('click', () => {
     dom.revealYear.title       = '';
   }
   dom.yearEditSection.classList.add('hidden');
+});
+
+// Steal
+dom.btnConfirmSteal.addEventListener('click', confirmSteal);
+dom.btnSkipSteal.addEventListener('click', () => {
+  closeStealWindow();
+  dom.btnNextTeam.textContent = 'Next Team →';
+  dom.btnNextTeam.classList.remove('hidden');
+  emitState();
 });
 
 // End game
@@ -1218,6 +1408,7 @@ dom.progressBarWrap.addEventListener('click', async (e) => {
   state.cardsToWin     = gameData.cardsToWin;
   state.hardModeFinal  = gameData.hardModeFinal;
   state.hardModeAll    = gameData.hardModeAll;
+  state.stealEnabled   = gameData.stealEnabled || false;
   state.allTracks      = gameData.allTracks;
   state.deck           = gameData.deck;
   state.activeTeams    = gameData.activeTeams;
@@ -1260,6 +1451,16 @@ dom.progressBarWrap.addEventListener('click', async (e) => {
       nextTeam();
       // If nextTeam() landed in pre-turn (not sudden-death or game-over), start immediately
       if (state.phase === 'pre-turn') beginTurn();
+    });
+
+    _io.on('player:steal_requested', ({ teamIndex }) => {
+      if (state._stealPhase === 'available') requestSteal(teamIndex);
+    });
+    _io.on('player:steal_slot_selected', ({ slotIndex }) => {
+      if (state._stealPhase === 'placing') selectStealSlot(slotIndex);
+    });
+    _io.on('player:steal_confirm', () => {
+      if (state._stealPhase === 'placing' && state._stealSlot !== null) confirmSteal();
     });
 
     _io.on('connect_error', () => {

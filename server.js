@@ -880,6 +880,26 @@ io.on('connection', (socket) => {
     io.to(room.hostSocketId).emit('player:next_team');
   });
 
+  socket.on('player:steal_request', ({ code }) => {
+    const room = rooms.get((code || '').toUpperCase());
+    if (!room) return;
+    const player    = room.players.find(p => p.socketId === socket.id);
+    const teamIndex = player?.teamIndex ?? socket.data?.teamIndex ?? -1;
+    io.to(room.hostSocketId).emit('player:steal_requested', { teamIndex });
+  });
+
+  socket.on('player:steal_slot', ({ code, slotIndex }) => {
+    const room = rooms.get((code || '').toUpperCase());
+    if (!room) return;
+    io.to(room.hostSocketId).emit('player:steal_slot_selected', { slotIndex });
+  });
+
+  socket.on('player:steal_confirm', ({ code }) => {
+    const room = rooms.get((code || '').toUpperCase());
+    if (!room) return;
+    io.to(room.hostSocketId).emit('player:steal_confirm');
+  });
+
   // Disconnect cleanup
   socket.on('disconnect', () => {
     if (socket.data?.code) {

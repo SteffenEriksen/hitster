@@ -1722,6 +1722,47 @@ button { cursor: pointer; font-family: inherit; border: none; outline: none; }
 }
 .year-edit-input:focus { outline: none; border-color: var(--primary, #007272); }
 
+/* ─── Steal section ──────────────────────────────────────────────────────────── */
+.steal-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 0 4px;
+  border-top: 2px dashed #f97316;
+  margin-top: 8px;
+}
+.steal-available-header {
+  font-size: 1rem;
+  font-weight: 800;
+  color: #c2410c;
+}
+.steal-available-sub {
+  font-size: 0.78rem;
+  color: var(--grey-500);
+  margin: 0;
+}
+.steal-team-btns {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+.btn-steal-team {
+  background: #fff7ed;
+  border: 2px solid #f97316;
+  color: #c2410c;
+  font-weight: 700;
+  font-size: 0.82rem;
+  font-family: inherit;
+  border-radius: 20px;
+  padding: 6px 16px;
+  cursor: pointer;
+  transition: background 0.12s;
+}
+.btn-steal-team:hover:not(:disabled) { background: #ffedd5; }
+.btn-steal-team.queued { background: #f97316; color: #fff; border-color: #f97316; cursor: default; }
+
 /* ─── Overturn section ───────────────────────────────────────────────────── */
 .overturn-section {
   display: flex;

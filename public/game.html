@@ -121,6 +121,14 @@
           <button id="btn-year-dismiss" class="btn-ghost btn-sm">Looks right</button>
         </div>
       </div>
+
+      <!-- Steal window (shown when steal is available or in progress) -->
+      <div id="steal-section" class="steal-section hidden">
+        <div class="steal-available-header">🤚 Steal available!</div>
+        <p class="steal-available-sub">First team to claim gets the attempt</p>
+        <div id="steal-team-btns" class="steal-team-btns"></div>
+        <button id="btn-skip-steal" class="btn-ghost btn-sm">⏭ Skip steal</button>
+      </div>
     </div>
 
     <!-- Decade reveal -->
@@ -185,6 +193,7 @@
     <footer class="game-footer">
       <button id="btn-start-turn" class="btn-primary">▶ Start Turn</button>
       <button id="btn-confirm" class="btn-confirm hidden">✓ Confirm Placement</button>
+      <button id="btn-confirm-steal" class="btn-confirm hidden">🤚 Confirm Steal</button>
       <button id="btn-next-team" class="btn-next hidden">Next Team →</button>
     </footer>
   </div>
@@ -223,6 +232,17 @@
         </div>
         <span class="toggle-switch-wrap">
           <input type="checkbox" id="gs-hard-all" class="toggle-check">
+          <span class="toggle-track"><span class="toggle-thumb"></span></span>
+        </span>
+      </label>
+
+      <label class="gs-toggle-row">
+        <div class="gs-toggle-info">
+          <span class="gs-toggle-name">Steal</span>
+          <span class="gs-toggle-desc">Other teams can steal a failed card — fail a steal and lose your last card</span>
+        </div>
+        <span class="toggle-switch-wrap">
+          <input type="checkbox" id="gs-steal" class="toggle-check">
           <span class="toggle-track"><span class="toggle-thumb"></span></span>
         </span>
       </label>

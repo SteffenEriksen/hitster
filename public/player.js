@@ -140,7 +140,13 @@ function renderGame(snap) {
   }
 
   // Phase-specific panel
-  if (snap.phase === 'revealed' || !caughtUp) {
+  const isCurrentStealer = snap.currentStealer?.teamIndex === myTeamIndex;
+
+  if (snap.stealPhase === 'placing' && isCurrentStealer) {
+    content += renderStealPlacingPanel(snap);
+  } else if (snap.stealPhase === 'placing') {
+    content += renderStealWatchingPanel(snap);
+  } else if (snap.phase === 'revealed' || !caughtUp) {
     content += renderRevealedPanel(snap, isMyTurn);
   } else if (snap.phase === 'pre-turn') {
     content += renderPreTurnPanel(snap, isMyTurn, myCards);
@@ -155,6 +161,7 @@ function renderGame(snap) {
   attachConfirmListener();
   attachNextTeamListener();
   attachContinueListener(snap);
+  attachStealListeners(snap);
 }
 
 function renderPreTurnPanel(snap, isMyTurn, myCards) {
@@ -178,11 +185,25 @@ function renderPlayingPanel(snap, isMyTurn, myCards) {
           '<button id="p-confirm-btn" class="p-btn">✓ Confirm Placement</button>'
         : h('p', 'p-waiting', 'Tap a + to place the card')));
   }
+  // Other team's turn
+  const stealAvailable = snap.stealPhase === 'available';
+  const alreadyQueued  = stealAvailable && (snap.stealQueue || []).some(s => s.teamIndex === myTeamIndex);
+  const queuePos       = stealAvailable && (snap.stealQueue || []).findIndex(s => s.teamIndex === myTeamIndex);
+  let stealBtn;
+  if (stealAvailable && !alreadyQueued) {
+    stealBtn = '<button id="p-steal-btn" class="p-btn" style="background:#e85d04;margin-top:8px">🤚 Steal!</button>';
+  } else if (stealAvailable && alreadyQueued) {
+    stealBtn = h('p', 'p-status', '🤚 You are #' + (queuePos + 1) + ' in the steal queue');
+  } else {
+    stealBtn = '<button class="p-steal" disabled title="Steal is ' + (snap.stealEnabled ? 'not available yet' : 'disabled') + '">🔒 Steal</button>';
+  }
   return h('div', 'p-card',
-    h('p', 'p-status', '🎵 ' + esc(snap.currentTeamName) + ' is choosing…') +
+    (stealAvailable
+      ? h('p', 'p-status', '🤚 Steal available! ' + esc(snap.currentTeamName) + ' failed.')
+      : h('p', 'p-status', '🎵 ' + esc(snap.currentTeamName) + ' is choosing…')) +
     h('p', 'p-section-title', 'Their timeline') +
     renderTimeline(snap.teams[snap.currentTeamIndex]?.cards || [], false, null) +
-    '<button class="p-steal" disabled title="Coming soon">🔒 Steal (coming soon)</button>');
+    stealBtn);
 }
 
 function renderRevealedPanel(snap, isMyTurn) {
@@ -210,6 +231,29 @@ function renderRevealedPanel(snap, isMyTurn) {
     html += '<button id="p-continue-btn" class="p-btn" style="margin-top:4px">Continue →</button>';
   }
   return html;
+}
+
+function renderStealPlacingPanel(snap) {
+  const stealer = snap.currentStealer;
+  const cards   = stealer?.cards || [];
+  const sel     = stealer?.stealSlot ?? null;
+  return h('div', 'p-card',
+    h('div', 'p-next-banner', '🤚 Your team is stealing!') +
+    h('p', 'p-waiting', 'Place the card on your timeline:') +
+    renderTimeline(cards, true, sel) +
+    (sel !== null
+      ? h('p', 'p-status', '✓ Slot ' + (sel + 1) + ' selected') +
+        '<button id="p-steal-confirm-btn" class="p-btn" style="background:#e85d04">🤚 Confirm Steal</button>'
+      : h('p', 'p-waiting', 'Tap a + to place the card')));
+}
+
+function renderStealWatchingPanel(snap) {
+  const stealer = snap.currentStealer;
+  const name    = stealer ? esc(snap.teams[stealer.teamIndex]?.name || 'A team') : 'A team';
+  return h('div', 'p-card',
+    h('p', 'p-status', '🤚 ' + name + ' is attempting a steal…') +
+    h('p', 'p-section-title', 'Their timeline') +
+    renderTimeline(stealer?.cards || [], false, null));
 }
 
 function renderFinishedPanel(snap) {
@@ -260,6 +304,37 @@ function attachNextTeamListener() {
     seenReveal = false;
     socket.emit('player:next_team', { code: roomCode });
   });
+}
+
+function attachStealListeners(snap) {
+  // Steal claim button
+  const stealBtn = document.getElementById('p-steal-btn');
+  if (stealBtn) {
+    stealBtn.addEventListener('click', () => {
+      stealBtn.disabled = true;
+      stealBtn.textContent = 'Waiting…';
+      socket.emit('player:steal_request', { code: roomCode });
+    });
+  }
+  // Steal slot selection on stealing team's timeline
+  const isCurrentStealer = snap.currentStealer?.teamIndex === myTeamIndex;
+  if (isCurrentStealer && snap.stealPhase === 'placing') {
+    document.querySelectorAll('.p-slot').forEach(el => {
+      el.addEventListener('click', () => {
+        const idx = parseInt(el.dataset.slot, 10);
+        socket.emit('player:steal_slot', { code: roomCode, slotIndex: idx });
+      });
+    });
+  }
+  // Confirm steal
+  const confirmStealBtn = document.getElementById('p-steal-confirm-btn');
+  if (confirmStealBtn) {
+    confirmStealBtn.addEventListener('click', () => {
+      confirmStealBtn.disabled = true;
+      confirmStealBtn.textContent = 'Confirming…';
+      socket.emit('player:steal_confirm', { code: roomCode });
+    });
+  }
 }
 
 function attachContinueListener(snap) {
