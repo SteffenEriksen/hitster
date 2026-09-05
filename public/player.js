@@ -18,11 +18,16 @@ function h(tag, cls, inner) {
   return '<' + tag + (cls ? ' class="' + cls + '"' : '') + '>' + (inner || '') + '</' + tag + '>';
 }
 
+// Prefix a team's name with its 1-based team number, e.g. "1: Team Awesome"
+function teamLabel(index, name) {
+  return (index + 1) + ': ' + name;
+}
+
 function renderScoreChips(snap) {
   const cur = snap.currentTeamIndex;
   return snap.teams.map((t, i) =>
     h('span', 'p-score-chip' + (i === cur ? ' active' : ''),
-      esc(t.name) + ': ' + t.cards.length)
+      esc(teamLabel(i, t.name)) + ': ' + t.cards.length)
   ).join('');
 }
 
@@ -62,8 +67,8 @@ function renderTimeline(cards, interactive, selectedSlot) {
 
 function renderJoinForm(teams) {
   const teamOpts = teams.length
-    ? teams.map((t, i) => '<option value="' + i + '">' + esc(t.name) + '</option>').join('')
-    : '<option value="0">Team 1</option><option value="1">Team 2</option>';
+    ? teams.map((t, i) => '<option value="' + i + '">' + esc(teamLabel(i, t.name)) + '</option>').join('')
+    : '<option value="0">1: Team 1</option><option value="1">2: Team 2</option>';
 
   app.innerHTML =
     h('div', 'p-header',
@@ -101,7 +106,7 @@ function renderLobby(players) {
     h('div', 'p-player-row',
       h('span', 'p-player-name', esc(p.name)) +
       (latestSnap?.teams?.[p.teamIndex]
-        ? h('span', 'p-player-team', esc(latestSnap.teams[p.teamIndex].name))
+        ? h('span', 'p-player-team', esc(teamLabel(p.teamIndex, latestSnap.teams[p.teamIndex].name)))
         : ''))
   ).join('') || h('p', 'p-waiting', 'No other players yet');
 
@@ -140,7 +145,7 @@ function renderGame(snap) {
     const pills = globalQueue.map((s, i) => {
       const isMine = s.teamIndex === myTeamIndex;
       return '<span class="p-steal-queue-pill' + (isMine ? ' p-steal-queue-pill--mine' : '') + '">'
-        + (isMine ? '★ ' : '') + esc(s.name)
+        + (isMine ? '★ ' : '') + esc(teamLabel(s.teamIndex, s.name))
         + (i === 0 ? ' <span class="p-steal-queue-first">1st</span>' : '')
         + '</span>';
     }).join('');
@@ -300,7 +305,7 @@ function renderStealPlacingPanel(snap) {
 
 function renderStealWatchingPanel(snap) {
   const stealer = snap.currentStealer;
-  const name    = stealer ? esc(snap.teams[stealer.teamIndex]?.name || 'A team') : 'A team';
+  const name    = stealer ? esc(teamLabel(stealer.teamIndex, snap.teams[stealer.teamIndex]?.name || 'A team')) : 'A team';
   return h('div', 'p-card',
     h('p', 'p-status', '🤚 ' + name + ' is attempting a steal…') +
     h('p', 'p-section-title', 'Their timeline') +
@@ -308,14 +313,10 @@ function renderStealWatchingPanel(snap) {
 }
 
 function renderScoreboardAndDecks(snap) {
-  // Sort by card count descending, keep original index for highlighting
-  const sorted = snap.teams
-    .map((t, i) => ({ ...t, idx: i }))
-    .sort((a, b) => b.cards.length - a.cards.length);
-
-  const teams = sorted.map(t => {
-    const isCurrent = t.idx === snap.currentTeamIndex;
-    const isMe      = t.idx === myTeamIndex;
+  // Fixed team order (matches setup order) — highlight current team instead of re-sorting by score
+  const teams = snap.teams.map((t, idx) => {
+    const isCurrent = idx === snap.currentTeamIndex;
+    const isMe      = idx === myTeamIndex;
     const cls       = 'p-team-deck'
       + (isMe      ? ' p-team-deck--mine'    : '')
       + (isCurrent ? ' p-team-deck--current' : '');
@@ -339,7 +340,7 @@ function renderScoreboardAndDecks(snap) {
 
     return h('div', cls,
       h('div', 'p-deck-header',
-        h('span', 'p-deck-name', esc(t.name)) +
+        h('span', 'p-deck-name', esc(teamLabel(idx, t.name))) +
         badge +
         h('span', 'p-deck-count', t.cards.length + ' card' + (t.cards.length !== 1 ? 's' : ''))
       ) +
@@ -350,11 +351,12 @@ function renderScoreboardAndDecks(snap) {
   return h('div', 'p-scoreboard', teams);
 }
 
+
 function renderFinishedPanel(snap) {
   if (!snap.winnerIndices) return '';
-  const winners  = snap.winnerIndices.map(i => snap.teams[i]);
+  const winners  = snap.winnerIndices.map(i => ({ ...snap.teams[i], idx: i }));
   const isTied   = winners.length > 1;
-  const names    = winners.map(w => esc(w.name)).join(' & ');
+  const names    = winners.map(w => esc(teamLabel(w.idx, w.name))).join(' & ');
   const subtitle = isTied
     ? 'Tied with ' + winners[0].cards.length + ' cards each!'
     : winners[0].cards.length + ' songs placed correctly 🎵';
@@ -362,12 +364,13 @@ function renderFinishedPanel(snap) {
   const emojis = ['🎉','🏆','🎊','🥇','🎵','⭐'];
   const e = emojis[Math.floor(Math.random() * emojis.length)];
 
-  const scores = [...snap.teams]
+  const scores = snap.teams
+    .map((t, i) => ({ ...t, idx: i }))
     .sort((a, b) => b.cards.length - a.cards.length)
     .map(t => {
-      const isWinner = snap.winnerIndices.some(i => snap.teams[i].name === t.name);
+      const isWinner = snap.winnerIndices.includes(t.idx);
       return '<div class="p-final-score-row' + (isWinner ? ' p-final-score-row--winner' : '') + '">' +
-        '<span class="p-final-score-name">' + (isWinner ? '🏆 ' : '') + esc(t.name) + '</span>' +
+        '<span class="p-final-score-name">' + (isWinner ? '🏆 ' : '') + esc(teamLabel(t.idx, t.name)) + '</span>' +
         '<span class="p-final-score-cards">' + t.cards.length + ' cards</span>' +
         '</div>';
     }).join('');

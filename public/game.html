@@ -103,7 +103,6 @@
       <div id="card-revealed" class="card card-revealed hidden">
         <div class="card-year-row">
           <div class="card-year" id="reveal-year">—</div>
-          <button id="btn-edit-year" class="btn-edit-year hidden" title="Correct year">✎</button>
         </div>
         <div class="card-title" id="reveal-title">—</div>
         <div class="card-artist" id="reveal-artist">—</div>
@@ -121,7 +120,8 @@
           </div>
         </div>
       </div>
-      <!-- Year correction (shown when yearUncertain after reveal) -->
+      <!-- Year correction (shown when yearUncertain after reveal, or via ✎ any time after a guess) -->
+      <button id="btn-edit-year" class="btn-edit-year hidden" title="Correct year">✎ Correct year</button>
       <div id="year-edit-section" class="year-edit-section hidden">
         <span class="year-edit-label">⚠ Year may be approximate — correct if needed:</span>
         <div class="year-edit-row">

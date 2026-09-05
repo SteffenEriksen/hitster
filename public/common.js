@@ -230,6 +230,40 @@ async function spotifySeek(position_ms = 0) {
   throw new Error(json.error?.message || 'Spotify error (' + res.status + ')');
 }
 
+// Current playback state — used to read the device's current volume before muting it.
+async function spotifyGetPlaybackState() {
+  if (!personalSpotify.isConnected()) return null;
+  const res = await personalSpotify.spotifyFetch('https://api.spotify.com/v1/me/player');
+  if (!res || !res.ok || res.status === 204) return null;
+  return res.json().catch(() => null);
+}
+
+// Volume control — used to keep the Spotify Connect session alive between turns
+// (muting instead of pausing) rather than to change the game's actual listening volume.
+async function spotifySetVolume(percent) {
+  if (!personalSpotify.isConnected()) throw new Error('No Spotify account connected.');
+  const pct = Math.max(0, Math.min(100, Math.round(percent)));
+  const res = await personalSpotify.spotifyFetch(
+    'https://api.spotify.com/v1/me/player/volume?volume_percent=' + pct, { method: 'PUT' });
+  if (res && (res.ok || res.status === 204)) return;
+  if (!res) throw new Error('Could not reach Spotify.');
+  const json = await res.json().catch(() => ({}));
+  throw new Error(json.error?.message || 'Spotify volume error (' + res.status + ')');
+}
+
+// Repeat mode — 'track' keeps a paused-in-spirit gap looping so the device never reaches
+// end-of-track (and thus never fully stops) while waiting between turns.
+async function spotifySetRepeat(mode) {
+  if (!personalSpotify.isConnected()) throw new Error('No Spotify account connected.');
+  const res = await personalSpotify.spotifyFetch(
+    'https://api.spotify.com/v1/me/player/repeat?state=' + mode, { method: 'PUT' });
+  if (res && (res.ok || res.status === 204)) return;
+  if (!res) throw new Error('Could not reach Spotify.');
+  const json = await res.json().catch(() => ({}));
+  throw new Error(json.error?.message || 'Spotify repeat error (' + res.status + ')');
+}
+
+
 // ─── Year localStorage cache ──────────────────────────────────────────────────
 
 const YEAR_KEY      = 'hitster_year_';

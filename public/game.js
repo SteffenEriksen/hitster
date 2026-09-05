@@ -1,5 +1,10 @@
 'use strict';
 
+// Prefix a team's name with its 1-based team number, e.g. "1: Team Awesome"
+function teamLabel(index, name) {
+  return (index + 1) + ': ' + name;
+}
+
 // ─── DOM refs ─────────────────────────────────────────────────────────────────
 
 const $ = (id) => document.getElementById(id);
@@ -147,8 +152,16 @@ const state = {
   _stealQueue:    [],     // [{ teamIndex, name }] ordered by claim time
   _stealQueueIdx: 0,      // index of current stealer in queue
   _stealSlot:     null,   // slot selected by current stealer
+  _stealHistory:  [],     // resolved attempts for the CURRENT card: [{ teamIndex, slot, correct, poppedCard }]
+                           // kept around (even after the steal window closes) so a later year
+                           // correction can undo/redo the steal outcome — cleared on a new card.
+
   _blindSteal:    false,  // true = steal was pre-registered; card stays hidden until steal resolves
+  _cardClaimedByOriginal: false, // true = a year correction proved the original guess right while
+                                  // a steal was still queued/in-progress — that attempt is now void,
+                                  // but we keep waiting for it to resolve (or let the host Accept it)
 };
+
 
 // ─── Multiplayer state ────────────────────────────────────────────────────────
 
@@ -200,7 +213,55 @@ let _playStartTime = null;
 let _playedMs     = 0;
 let _trackDuration = 0;
 
+// ─── Spotify Connect session keepalive ────────────────────────────────────────
+// Actually pausing between turns lets the Spotify Connect device idle out — after a
+// while it drops off as the "active device" and the host has to physically tap play
+// again before /play works. Instead we mute the volume and keep it looping (repeat
+// = track) so it's never actually paused/stopped, then restore the volume before the
+// next card plays. Repeat=track also means a song that runs to its natural end —
+// during active guessing or during the muted wait — just starts over automatically,
+// instead of going silent and leaving nothing playing.
+let _savedVolume    = null;   // volume_percent to restore ( null = unknown/never captured )
+let _sessionMuted   = false;  // true while we're holding the session open via mute
+let _repeatEnsured  = false;  // true once we've set repeat=track for this Spotify session
+
+async function ensureRepeatTrack() {
+  if (_repeatEnsured || !personalSpotify.isConnected()) return;
+  try {
+    await spotifySetRepeat('track');
+    _repeatEnsured = true;
+  } catch (_) {
+    // Not all devices support repeat mode — harmless if it fails, we just lose the
+    // auto-restart-on-end behaviour on that device.
+  }
+}
+
+async function holdSpotifySession() {
+  if (!personalSpotify.isConnected()) return;
+  try {
+    if (_savedVolume === null) {
+      const pb = await spotifyGetPlaybackState();
+      if (pb && typeof pb.device?.volume_percent === 'number') _savedVolume = pb.device.volume_percent;
+    }
+    await spotifySetVolume(0);
+    _sessionMuted = true;
+  } catch (_) {
+    // Device doesn't support volume control (e.g. some smart speakers) — fall back
+    // to a real pause rather than leaving it playing at full volume.
+    try { await spotifyPause(); } catch (_) {}
+  }
+}
+
+async function releaseSpotifySession() {
+  if (!_sessionMuted) return;
+
+  try { await spotifySetVolume(_savedVolume ?? 70); } catch (_) {}
+  _sessionMuted = false;
+}
+
+
 function startProgress(durationMs) {
+
   _trackDuration = durationMs || 0;
   _playStartTime = Date.now();
   _playedMs = 0;
@@ -252,7 +313,7 @@ function renderScoreChips() {
     const active = i === curIdx;
     const inGame = !state.isTiebreaker || state.activeTeams.includes(i);
     if (!inGame) return '';
-    return `<span class="score-chip${active ? ' active' : ''}">${t.name}: ${t.cards.length}</span>`;
+    return `<span class="score-chip${active ? ' active' : ''}">${esc(teamLabel(i, t.name))}: ${t.cards.length}</span>`;
   }).join('');
 }
 
@@ -262,11 +323,12 @@ function renderDeckCounter() {
 
 function renderCurrentTeamBar() {
   const team   = currentTeam();
+  const idx    = currentTeamIndex();
   const showMp = !state.isTiebreaker &&
     state.teams.some(t => t.cards.length >= state.cardsToWin);
   dom.currentTeamBar.innerHTML =
     `<span class="ctb-label">Now playing</span>` +
-    `<span class="ctb-name">${esc(team.name)}</span>` +
+    `<span class="ctb-name">${esc(teamLabel(idx, team.name))}</span>` +
     `<span class="ctb-count">${team.cards.length} card${team.cards.length !== 1 ? 's' : ''}</span>` +
     (showMp ? `<span class="mp-badge">🎯 Match Point</span>` : '');
 }
@@ -275,7 +337,7 @@ function renderOtherTeams() {
   const curIdx = currentTeamIndex();
   const others = state.teams.map((t, i) => ({ t, i })).filter(({ i }) => i !== curIdx);
   if (others.length === 0) { dom.otherTeams.innerHTML = ''; return; }
-  dom.otherTeams.innerHTML = others.map(({ t }) => {
+  dom.otherTeams.innerHTML = others.map(({ t, i }) => {
     const cardsHtml = t.cards.length === 0
       ? `<span class="otr-empty">No cards yet</span>`
       : t.cards.map(c =>
@@ -285,11 +347,12 @@ function renderOtherTeams() {
           </div>`
         ).join('');
     return `<div class="other-team-row">
-      <span class="otr-name">${esc(t.name)}</span>
+      <span class="otr-name">${esc(teamLabel(i, t.name))}</span>
       <div class="otr-cards">${cardsHtml}</div>
     </div>`;
   }).join('');
 }
+
 
 // ─── Draw a card from the deck ────────────────────────────────────────────────
 
@@ -305,10 +368,10 @@ function drawCard() {
 // ─── Starting cards overlay ───────────────────────────────────────────────────
 
 function showStartingCards() {
-  dom.startingCardsGrid.innerHTML = state.teams.map(t => {
+  dom.startingCardsGrid.innerHTML = state.teams.map((t, i) => {
     const c = t.cards[0];
     return `<div class="starting-card-row">
-      <div class="starting-card-team">${esc(t.name)}</div>
+      <div class="starting-card-team">${esc(teamLabel(i, t.name))}</div>
       <div class="starting-card-info">
         <div class="sc-year">${c ? (c.yearUncertain ? '~' : '') + c.year : '?'}</div>
         <div class="sc-title">${esc(c ? c.title : '—')}</div>
@@ -420,7 +483,7 @@ function buildSnapshot() {
   return {
     phase:            state.phase,
     currentTeamIndex: currentTeamIndex(),
-    currentTeamName:  team.name,
+    currentTeamName:  teamLabel(currentTeamIndex(), team.name),
     nextTeamIndex:    state.activeTeams[nextCursor],   // who plays after this turn
     teams: state.teams.map((t, i) => ({
       name:     t.name,
@@ -507,7 +570,7 @@ function _renderPlayerList() {
       startList.innerHTML =
         '<div class="rpl-header">👥 ' + _roomPlayers.length + ' player' + (_roomPlayers.length !== 1 ? 's' : '') + ' joined</div>' +
         _roomPlayers.map(p => {
-          const teamName = state.teams[p.teamIndex]?.name || ('Team ' + (p.teamIndex + 1));
+          const teamName = teamLabel(p.teamIndex, state.teams[p.teamIndex]?.name || ('Team ' + (p.teamIndex + 1)));
           return '<div class="rpl-row">' +
             '<span class="rpl-dot">●</span>' +
             '<span class="rpl-name">' + esc(p.name) + '</span>' +
@@ -522,7 +585,7 @@ function _renderPlayerList() {
     dom.playerListPanel.innerHTML = _roomPlayers.length === 0
       ? '<p class="plp-empty">No players yet</p>'
       : _roomPlayers.map(p => {
-          const teamName = state.teams[p.teamIndex]?.name || ('Team ' + (p.teamIndex + 1));
+          const teamName = teamLabel(p.teamIndex, state.teams[p.teamIndex]?.name || ('Team ' + (p.teamIndex + 1)));
           return '<div class="plp-row">' +
             '<span class="plp-name">' + esc(p.name) + '</span>' +
             '<span class="plp-team">' + esc(teamName) + '</span>' +
@@ -619,10 +682,12 @@ function enterPreTurn() {
   } else {
     dom.gameScreen.classList.remove('tiebreaker');
     dom.tbBadge.classList.add('hidden');
-    const atGoal = state.teams.filter(t => t.cards.length >= state.cardsToWin);
+    const atGoal = state.teams
+      .map((t, i) => ({ ...t, idx: i }))
+      .filter(t => t.cards.length >= state.cardsToWin);
     if (atGoal.length > 0) {
       dom.gameScreen.classList.add('match-point');
-      const names = atGoal.map(t => t.name).join(' & ');
+      const names = atGoal.map(t => teamLabel(t.idx, t.name)).join(' & ');
       const verb  = atGoal.length === 1 ? 'has' : 'have';
       dom.matchPointBanner.textContent =
         `🎯 ${names} ${verb} ${atGoal[0].cards.length} cards — last round in progress!`;
@@ -634,7 +699,7 @@ function enterPreTurn() {
   }
 
   const team = currentTeam();
-  dom.currentTeamName.textContent = team.name;
+  dom.currentTeamName.textContent = teamLabel(currentTeamIndex(), team.name);
   renderScoreChips();
   renderDeckCounter();
   renderCurrentTeamBar();
@@ -659,8 +724,11 @@ async function beginTurn() {
   const card = drawCard();
   if (!card) return;
 
-  state.currentCard  = card;
-  state.selectedSlot = null;
+  state.currentCard   = card;
+  state.selectedSlot  = null;
+  state._stealHistory = [];   // fresh card — clear any prior steal-correction bookkeeping
+  state._cardClaimedByOriginal = false;
+  _syncSkipStealButton();
   state.phase        = 'playing';
   state.isPlaying    = false;
 
@@ -687,8 +755,11 @@ async function beginTurn() {
   renderTimeline(true);
 
   try {
+    await releaseSpotifySession();   // restore volume if we were holding the session open
     await spotifyPlay(card.uri);
     state.isPlaying = true;
+    ensureRepeatTrack();   // fire-and-forget: loop this track so it auto-restarts on natural end
+
     dom.btnPauseResume.textContent = '⏸ Pause';
     hidePlaybackError();
     startProgress(card.duration);
@@ -717,7 +788,7 @@ async function confirmPlacement() {
   dom.btnDiscard.classList.add('hidden');
   dom.discardConfirm.classList.add('hidden');
 
-  try { await spotifyPause(); } catch (_) {}
+  try { await holdSpotifySession(); } catch (_) {}
   state.isPlaying = false;
   stopProgress();
   dom.btnPauseResume.textContent = '▶ Resume';
@@ -819,7 +890,7 @@ function finishPlacement(correct, slot, fromHardMode = false) {
     dom.resultText.textContent = isBlindSteal ? '✗ Wrong! Steal in progress…' : '✗ Wrong! Card discarded.';
     if (fromHardMode) {
       state.pendingOverturnSlot = slot;
-      dom.overturnTeamName.textContent = team.name;
+      dom.overturnTeamName.textContent = teamLabel(currentTeamIndex(), team.name);
       dom.overturnSection.classList.remove('hidden');
     }
   }
@@ -829,13 +900,12 @@ function finishPlacement(correct, slot, fromHardMode = false) {
   renderCurrentTeamBar();
   renderOtherTeams();
 
-  // Only show year-edit for non-blind-steal (card is hidden during blind steal)
-  if (!isBlindSteal) {
-    dom.btnEditYear.classList.remove('hidden');
-    if (card.yearUncertain) {
-      dom.yearEditInput.value = card.year;
-      dom.yearEditSection.classList.remove('hidden');
-    }
+  // Year is always correctable after a guess — even during a blind steal (the reveal itself
+  // stays hidden until the steal window closes, but the host can fix the underlying year now).
+  dom.btnEditYear.classList.remove('hidden');
+  if (card.yearUncertain) {
+    dom.yearEditInput.value = card.year;
+    dom.yearEditSection.classList.remove('hidden');
   }
 
   if (correct && outcomeAlreadyDetermined()) {
@@ -862,10 +932,52 @@ function overturnPlacement() {
   state.pendingOverturnSlot = null;
   dom.overturnSection.classList.add('hidden');
   dom.resultBanner.className = 'result-banner correct';
-  dom.resultText.textContent = '↩ Overturned! Card awarded to ' + team.name + '.';
+  dom.resultText.textContent = '↩ Overturned! Card awarded to ' + teamLabel(currentTeamIndex(), team.name) + '.';
   renderTimeline(false);
   renderCurrentTeamBar();
   renderOtherTeams();
+}
+
+// ─── Steal-outcome bookkeeping for year corrections ───────────────────────────
+
+/** Reverse the card-count effect of one resolved steal attempt (used before a replay). */
+function _undoStealHistoryEntry(entry, card) {
+  const stealTeam = state.teams[entry.teamIndex];
+  if (entry.correct) {
+    const idx = stealTeam.cards.indexOf(card);
+    if (idx !== -1) stealTeam.cards.splice(idx, 1);
+  } else if (entry.poppedCard) {
+    stealTeam.cards.push(entry.poppedCard);
+    stealTeam.cards.sort((a, b) => a.year - b.year);
+  }
+}
+
+/**
+ * Replay a list of steal attempts (in original order) against the given timeline/year,
+ * applying the same win/lose rules as confirmSteal(). Stops after the first success,
+ * since in real play the steal window closes as soon as someone succeeds.
+ */
+function _replayStealHistory(attempts, card, cards, year) {
+  const newHistory = [];
+  let resolved = false;
+  for (const entry of attempts) {
+    if (resolved) break; // a success ends the queue — later attempts never would have happened
+    const stealTeam = state.teams[entry.teamIndex];
+    const leftOk  = entry.slot === 0 || cards[entry.slot - 1].year <= year;
+    const rightOk = entry.slot >= cards.length || cards[entry.slot].year >= year;
+    const correct = leftOk && rightOk;
+    let poppedCard = null;
+    if (correct) {
+      stealTeam.cards.push(card);
+      stealTeam.cards.sort((a, b) => a.year - b.year);
+      resolved = true;
+    } else if (stealTeam.cards.length > 1) {
+      poppedCard = stealTeam.cards[stealTeam.cards.length - 1];
+      stealTeam.cards.pop();
+    }
+    newHistory.push({ teamIndex: entry.teamIndex, slot: entry.slot, correct, poppedCard });
+  }
+  return newHistory;
 }
 
 function applyYearCorrection(newYear) {
@@ -891,16 +1003,56 @@ function applyYearCorrection(newYear) {
   const rightOk = slot >= cards.length || cards[slot]?.year >= newYear;
   const correct = leftOk && rightOk;
 
+  // If a steal already resolved (or is still in progress) on this card, its outcome depends on
+  // the team-in-turn's corrected result — undo any already-applied effects first.
+  const priorAttempts   = state._stealHistory;
+  const hadStealHistory = priorAttempts.length > 0;
+  const stealIsPending   = state._stealPhase === 'available' || state._stealPhase === 'placing';
+  if (hadStealHistory) {
+    for (const entry of priorAttempts) _undoStealHistoryEntry(entry, card);
+    state._stealHistory = [];
+  }
+
+  let stealNote  = '';
+  let deferAward = false;
+
   if (correct) {
+    if (stealIsPending) {
+      // A steal is still queued/in-progress right now — don't cut it short mid-flow.
+      // Keep waiting: the pending attempt will be voided (with no effect) once it resolves,
+      // or the host can award the card immediately via "Accept card".
+      state._cardClaimedByOriginal = true;
+      deferAward = true;
+      stealNote = ' Waiting for the in-progress steal — it will have no effect.';
+    } else if (hadStealHistory) {
+      // Already resolved earlier — void it now, nothing left to wait for.
+      stealNote = ' Steal voided — card returns to the original team.';
+    }
+  } else if (hadStealHistory) {
+    // Still wrong — re-check the already-resolved steal attempt(s) against the corrected year.
+    state._stealHistory = _replayStealHistory(priorAttempts, card, cards, newYear);
+    const winner = state._stealHistory.find(e => e.correct);
+    stealNote = winner
+      ? ' Steal outcome updated: ' + teamLabel(winner.teamIndex, state.teams[winner.teamIndex].name) + ' actually stole the card!'
+      : ' Steal outcome re-checked against the corrected year.';
+  }
+
+  _syncSkipStealButton();
+
+  if (correct && !deferAward) {
     team.cards.splice(slot, 0, card);
     dom.resultBanner.className = 'result-banner correct';
-    dom.resultText.textContent = '✓ Correct! Card added to timeline.';
+    dom.resultText.textContent = '✓ Correct! Card added to timeline.' + stealNote;
     dom.cardRevealed.classList.remove('wrong');
     dom.overturnSection.classList.add('hidden');
     state.pendingOverturnSlot = null;
+  } else if (correct && deferAward) {
+    dom.resultBanner.className = 'result-banner correct';
+    dom.resultText.textContent = '✓ Correct!' + stealNote;
+    dom.cardRevealed.classList.remove('wrong');
   } else {
     dom.resultBanner.className = 'result-banner wrong';
-    dom.resultText.textContent = '✗ Wrong! Card discarded.';
+    dom.resultText.textContent = '✗ Wrong! Card discarded.' + stealNote;
     dom.cardRevealed.classList.add('wrong');
   }
 
@@ -908,9 +1060,23 @@ function applyYearCorrection(newYear) {
   dom.revealYear.title       = '';
   dom.yearEditSection.classList.add('hidden');
 
-  renderTimeline(false);
+  // Don't stomp on an in-progress interactive steal placement UI
+  if (state._stealPhase === 'placing') {
+    renderTimeline(true, currentTeam().cards, state._stealSlot, selectStealSlot);
+  } else {
+    renderTimeline(false);
+  }
   renderCurrentTeamBar();
   renderOtherTeams();
+  renderScoreChips();
+
+  emitState({ result: { correct, text: dom.resultText.textContent } });
+
+  if (deferAward) {
+    // Stay in "waiting for the steal" mode — Next Team stays hidden until it resolves
+    // (via confirmSteal's void path) or the host clicks "Accept card".
+    return;
+  }
 
   // Re-check whether the outcome is now determined
   if (correct && outcomeAlreadyDetermined()) {
@@ -923,6 +1089,8 @@ function applyYearCorrection(newYear) {
     state._skipToWin = false;
     dom.btnNextTeam.textContent = 'Next Team →';
   }
+
+
 }
 
 function nextTeam() {
@@ -952,7 +1120,7 @@ function showSuddenDeath() {
     const sep = idx < state.activeTeams.length - 1
       ? '<span class="sd-versus">VS</span>'
       : '';
-    return `<span class="sd-team-name">${esc(state.teams[i].name)}</span>${sep}`;
+    return `<span class="sd-team-name">${esc(teamLabel(i, state.teams[i].name))}</span>${sep}`;
   }).join('');
   dom.suddenDeathOverlay.classList.remove('hidden');
 }
@@ -1057,9 +1225,11 @@ function openStealWindow() {
   state._stealPhase   = 'available';
   state._stealQueueIdx = 0;
   state._stealSlot    = null;
+  _syncSkipStealButton();
 
   dom.btnNextTeam.classList.add('hidden');
   dom.btnConfirmSteal.classList.add('hidden');
+
 
   if (state._stealQueue.length > 0) {
     // Teams pre-registered — start first attempt straight away
@@ -1080,7 +1250,7 @@ function _renderStealTeamBtns() {
     const isCurrent = state._stealQueueIdx < state._stealQueue.length &&
                       state._stealQueue[state._stealQueueIdx].teamIndex === i;
     return `<button class="btn-steal-team${inQueue ? ' queued' : ''}" data-team="${i}"${inQueue ? ' disabled' : ''}>` +
-      esc(t.name) + (inQueue ? (isCurrent ? ' ▶' : ' #' + (state._stealQueue.findIndex(s => s.teamIndex === i) + 1)) : '') +
+      esc(teamLabel(i, t.name)) + (inQueue ? (isCurrent ? ' ▶' : ' #' + (state._stealQueue.findIndex(s => s.teamIndex === i) + 1)) : '') +
       `</button>`;
   }).join('');
   dom.stealTeamBtns.querySelectorAll('.btn-steal-team:not([disabled])').forEach(btn => {
@@ -1109,7 +1279,7 @@ function startStealAttempt() {
   state._stealSlot  = null;
 
   // Update the team label area to show the stealer
-  dom.currentTeamName.textContent = '🤚 ' + stealer.name;
+  dom.currentTeamName.textContent = '🤚 ' + teamLabel(stealer.teamIndex, stealer.name);
   dom.stealSection.classList.add('hidden');
   dom.btnConfirmSteal.classList.add('hidden');
 
@@ -1132,7 +1302,20 @@ function confirmSteal() {
   const stealer = state._stealQueue[state._stealQueueIdx];
   if (!stealer || state._stealSlot === null) return;
 
+  if (state._cardClaimedByOriginal) {
+    // A year correction proved the original guess right while this attempt was in flight.
+    // The steal has no effect — award the card to the original team and close the window.
+    dom.btnConfirmSteal.classList.add('hidden');
+    dom.resultBanner.className = 'result-banner correct';
+    dom.resultText.textContent =
+      '✓ Year corrected — ' + teamLabel(currentTeamIndex(), currentTeam().name) + ' had it right! Steal voided, no effect.';
+    dom.resultBanner.classList.remove('hidden');
+    _finalizeCorrectedOriginalAward();
+    return;
+  }
+
   const stealTeam  = state.teams[stealer.teamIndex];
+
   const cards      = currentTeam().cards;   // placement checked on the CURRENT team's deck
   const slot       = state._stealSlot;
   const year       = state.currentCard.year;
@@ -1144,17 +1327,24 @@ function confirmSteal() {
   state._stealPhase = 'result';
   dom.btnConfirmSteal.classList.add('hidden');
 
+  let poppedCard = null;
   if (correct) {
     stealTeam.cards.push(state.currentCard); // card joins the STEALING team's timeline
     stealTeam.cards.sort((a, b) => a.year - b.year); // keep timeline ordered
     dom.resultBanner.className = 'result-banner correct';
-    dom.resultText.textContent = '🤚 Steal! ' + stealer.name + ' takes the card!';
+    dom.resultText.textContent = '🤚 Steal! ' + teamLabel(stealer.teamIndex, stealer.name) + ' takes the card!';
   } else {
     // Lose last card — but protect the initial (first) card; minimum 1 card
-    if (stealTeam.cards.length > 1) stealTeam.cards.pop();
+    if (stealTeam.cards.length > 1) {
+      poppedCard = stealTeam.cards[stealTeam.cards.length - 1];
+      stealTeam.cards.pop();
+    }
     dom.resultBanner.className = 'result-banner wrong';
-    dom.resultText.textContent = '✗ Steal failed! ' + stealer.name + ' loses a card.';
+    dom.resultText.textContent = '✗ Steal failed! ' + teamLabel(stealer.teamIndex, stealer.name) + ' loses a card.';
   }
+
+  // Remember this attempt so a later year correction can undo/redo it against the corrected year
+  state._stealHistory.push({ teamIndex: stealer.teamIndex, slot, correct, poppedCard });
 
   dom.resultBanner.classList.remove('hidden');
   renderTimeline(false, currentTeam().cards, null, null); // keep showing current team's deck
@@ -1198,6 +1388,43 @@ function closeStealWindow() {
   dom.btnConfirmSteal.classList.add('hidden');
 }
 
+/** Reflect _cardClaimedByOriginal on the steal-window button: "Skip steal" ↔ "Accept card". */
+function _syncSkipStealButton() {
+  if (!dom.btnSkipSteal) return;
+  dom.btnSkipSteal.textContent = state._cardClaimedByOriginal ? '✓ Accept card' : '⏭ Skip steal';
+}
+
+/** Award the (year-corrected-to-right) card to the original team and end the steal window. */
+function _finalizeCorrectedOriginalAward() {
+  const team = currentTeam();
+  const card = state.currentCard;
+  if (card && team.cards.indexOf(card) === -1 && state.selectedSlot !== null) {
+    team.cards.splice(state.selectedSlot, 0, card);
+  }
+  state._cardClaimedByOriginal = false;
+  _syncSkipStealButton();
+  closeStealWindow();
+
+  renderTimeline(false);
+  renderCurrentTeamBar();
+  renderOtherTeams();
+  renderScoreChips();
+  emitState({ result: { correct: true, text: dom.resultText.textContent } });
+
+  if (outcomeAlreadyDetermined()) {
+    state._skipToWin = true;
+    dom.btnNextTeam.textContent = '🏆 See Results!';
+    dom.btnNextTeam.classList.remove('hidden');
+    setTimeout(() => {
+      if (state._skipToWin && state.phase === 'revealed') nextTeam();
+    }, 3000);
+  } else {
+    state._skipToWin = false;
+    dom.btnNextTeam.textContent = 'Next Team →';
+    dom.btnNextTeam.classList.remove('hidden');
+  }
+}
+
 function _revealCardUI() {
   const card = state.currentCard;
   if (!card) return;
@@ -1229,7 +1456,7 @@ function _updateStealIndicator() {
     // Teams have committed — make it unmissable
     dom.stealIndicator.className = 'steal-indicator steal-indicator--active';
     const names = state._stealQueue.map(s =>
-      '<span class="steal-team-pill">' + esc(s.name) + '</span>'
+      '<span class="steal-team-pill">' + esc(teamLabel(s.teamIndex, s.name)) + '</span>'
     ).join('');
     dom.stealIndicatorText.innerHTML =
       '<span class="steal-indicator-icon">🤚</span>' +
@@ -1242,7 +1469,7 @@ function _updateStealIndicator() {
     dom.stealIndicatorText.innerHTML = '<span class="steal-indicator-icon">🤚</span> Mark steal for:';
     dom.hostStealTeamBtns.innerHTML = state.teams.map((t, i) => {
       if (i === curIdx) return '';
-      return `<button class="btn-host-steal-team" data-team="${i}">${esc(t.name)}</button>`;
+      return `<button class="btn-host-steal-team" data-team="${i}">${esc(teamLabel(i, t.name))}</button>`;
     }).join('');
     dom.hostStealTeamBtns.querySelectorAll('.btn-host-steal-team').forEach(btn => {
       btn.addEventListener('click', () => requestSteal(parseInt(btn.dataset.team, 10)));
@@ -1419,11 +1646,17 @@ dom.btnYearDismiss.addEventListener('click', () => {
 // Steal
 dom.btnConfirmSteal.addEventListener('click', confirmSteal);
 dom.btnSkipSteal.addEventListener('click', () => {
+  if (state._cardClaimedByOriginal) {
+    // Corrected to right — this click means "accept" the card instead of "skip" a real steal.
+    _finalizeCorrectedOriginalAward();
+    return;
+  }
   closeStealWindow();
   dom.btnNextTeam.textContent = 'Next Team →';
   dom.btnNextTeam.classList.remove('hidden');
   emitState();
 });
+
 
 // End game
 dom.btnEndGame.addEventListener('click', () => {
@@ -1494,8 +1727,10 @@ dom.btnRetryPlay.addEventListener('click', async () => {
   dom.playbackErrPanel.classList.add('hidden');
   dom.nowPlayingInfo.textContent = '↺ Retrying…';
   try {
+    await releaseSpotifySession();
     await spotifyPlay(state.currentCard.uri);
     state.isPlaying = true;
+    ensureRepeatTrack();
     dom.btnPauseResume.textContent = '⏸ Pause';
     hidePlaybackError();
     dom.nowPlayingInfo.textContent = '♪ Playing…';
@@ -1514,11 +1749,12 @@ dom.btnSkipSong.addEventListener('click', () => {
 dom.btnPauseResume.addEventListener('click', async () => {
   try {
     if (state.isPlaying) {
-      await spotifyPause();
+      await holdSpotifySession();
       state.isPlaying = false;
       pauseProgress();
       dom.btnPauseResume.textContent = '▶ Resume';
     } else {
+      await releaseSpotifySession();
       await spotifyResume();
       state.isPlaying = true;
       resumeProgress();
@@ -1531,6 +1767,7 @@ dom.btnPauseResume.addEventListener('click', async () => {
 
 dom.btnRestart.addEventListener('click', async () => {
   try {
+    await releaseSpotifySession();
     await spotifySeek();
     _playedMs = 0;
     _playStartTime = Date.now();
@@ -1544,6 +1781,7 @@ dom.btnRestart.addEventListener('click', async () => {
     dom.nowPlayingInfo.textContent = '⚠ ' + e.message;
   }
 });
+
 
 dom.progressBarWrap.addEventListener('click', async (e) => {
   if (_trackDuration === 0) return;
@@ -1605,6 +1843,7 @@ dom.progressBarWrap.addEventListener('click', async (e) => {
       sessionStorage.setItem('hitster_room_code', code);
       _showRoomPanel(code);
       _updateStartingJoinHint(code);
+      emitState();   // seed the room's snapshot immediately so QR/join info has real teams
     });
 
     _io.on('room:rejoined', ({ code, players }) => {
