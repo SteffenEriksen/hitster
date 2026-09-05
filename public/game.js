@@ -33,6 +33,7 @@ const dom = {
   gsSteal:            $('gs-steal'),
   gsHardNote:         $('gs-hard-note'),
   btnGsApply:         $('btn-gs-apply'),
+
   btnGsCancel:        $('btn-gs-cancel'),
   // Music controls
   musicControls:    $('music-controls'),
@@ -122,6 +123,37 @@ const dom = {
   stealIndicator:     $('steal-indicator'),
   stealIndicatorText: $('steal-indicator-text'),
   hostStealTeamBtns:  $('host-steal-team-btns'),
+  // Card action (click a placed card to edit/delete)
+  cardActionOverlay:   $('card-action-overlay'),
+  camYear:             $('cam-year'),
+  camTitle:            $('cam-title'),
+  camArtist:           $('cam-artist'),
+  camStepChoose:       $('cam-step-choose'),
+  camBtnEdit:          $('cam-btn-edit'),
+  camBtnDelete:        $('cam-btn-delete'),
+  camBtnCancel:        $('cam-btn-cancel'),
+  camStepEdit:         $('cam-step-edit'),
+  camYearInput:        $('cam-year-input'),
+  camEditConfirm:      $('cam-edit-confirm'),
+  camEditConfirmYear:  $('cam-edit-confirm-year'),
+  camEditApply:        $('cam-edit-apply'),
+  camEditBack:         $('cam-edit-back'),
+  camEditConfirmYes:   $('cam-edit-confirm-yes'),
+  camEditConfirmNo:    $('cam-edit-confirm-no'),
+  camStepDelete:       $('cam-step-delete'),
+  camDeleteTeamName:   $('cam-delete-team-name'),
+  camDeleteConfirmYes: $('cam-delete-confirm-yes'),
+  camDeleteConfirmNo:  $('cam-delete-confirm-no'),
+  // Add card
+  btnAddCard:      $('btn-add-card'),
+  addCardOverlay:  $('add-card-overlay'),
+  acTeam:          $('ac-team'),
+  acYear:          $('ac-year'),
+  acTitle:         $('ac-title'),
+  acArtist:        $('ac-artist'),
+  acError:         $('ac-error'),
+  acConfirm:       $('ac-confirm'),
+  acCancel:        $('ac-cancel'),
 };
 
 // ─── Game state ───────────────────────────────────────────────────────────────
@@ -340,18 +372,212 @@ function renderOtherTeams() {
   dom.otherTeams.innerHTML = others.map(({ t, i }) => {
     const cardsHtml = t.cards.length === 0
       ? `<span class="otr-empty">No cards yet</span>`
-      : t.cards.map(c =>
-          `<div class="otr-card">
+      : t.cards.map((c, ci) => {
+          const editable = !c.isStartingCard;
+          return `<div class="otr-card${editable ? ' editable' : ''}"${editable ? ` data-team="${i}" data-idx="${ci}" title="Click to edit or delete this card"` : ''}>
             <div class="otr-year" style="color:${getDecadeVibe(c.year).color}">${c.yearUncertain ? '~' : ''}${c.year}</div>
             <div class="otr-title">${esc(c.title)}</div>
-          </div>`
-        ).join('');
+          </div>`;
+        }).join('');
     return `<div class="other-team-row">
       <span class="otr-name">${esc(teamLabel(i, t.name))}</span>
       <div class="otr-cards">${cardsHtml}</div>
     </div>`;
   }).join('');
 }
+
+// Delegated click handler — otherTeams is re-rendered often, so attach once instead of
+// re-binding a listener per card on every render.
+dom.otherTeams?.addEventListener('click', (e) => {
+  const cardEl = e.target.closest('.otr-card.editable');
+  if (!cardEl) return;
+  openCardActionModal(parseInt(cardEl.dataset.team, 10), parseInt(cardEl.dataset.idx, 10));
+});
+
+// ─── Card actions: edit year / delete a placed card ───────────────────────────
+
+let _camCtx = null; // { teamIndex, cardIndex }
+
+/** Re-render every view that shows team decks, without disturbing an in-progress
+ *  interactive placement (new-card slot picking or steal-slot picking). */
+function _refreshAllTeamViews() {
+  if (state._stealPhase === 'placing') {
+    renderTimeline(true, currentTeam().cards, state._stealSlot, selectStealSlot);
+  } else if (state.phase === 'playing') {
+    renderTimeline(true);
+  } else {
+    renderTimeline(false);
+  }
+  renderCurrentTeamBar();
+  renderOtherTeams();
+  renderScoreChips();
+  emitState();
+}
+
+function openCardActionModal(teamIndex, cardIndex) {
+  const team = state.teams[teamIndex];
+  const card = team?.cards?.[cardIndex];
+  if (!card) return;
+
+  _camCtx = { teamIndex, cardIndex };
+
+  dom.camYear.textContent   = (card.yearUncertain ? '~' : '') + card.year;
+  dom.camTitle.textContent  = card.title || '(untitled)';
+  dom.camArtist.textContent = card.artist || '';
+
+  dom.camStepChoose.classList.remove('hidden');
+  dom.camStepEdit.classList.add('hidden');
+  dom.camStepDelete.classList.add('hidden');
+  dom.camEditConfirm.classList.add('hidden');
+  dom.camYearInput.value = card.year;
+
+  dom.cardActionOverlay.classList.remove('hidden');
+}
+
+function closeCardActionModal() {
+  dom.cardActionOverlay.classList.add('hidden');
+  _camCtx = null;
+}
+
+dom.camBtnCancel.addEventListener('click', closeCardActionModal);
+
+dom.camBtnEdit.addEventListener('click', () => {
+  dom.camStepChoose.classList.add('hidden');
+  dom.camStepEdit.classList.remove('hidden');
+  dom.camEditConfirm.classList.add('hidden');
+  dom.camYearInput.focus();
+  dom.camYearInput.select();
+});
+
+dom.camEditBack.addEventListener('click', () => {
+  dom.camStepEdit.classList.add('hidden');
+  dom.camEditConfirm.classList.add('hidden');
+  dom.camStepChoose.classList.remove('hidden');
+});
+
+// Step 1 of editing: ask for confirmation before actually applying the year change
+dom.camEditApply.addEventListener('click', () => {
+  const newYear = parseInt(dom.camYearInput.value, 10);
+  if (!newYear || newYear < 1900 || newYear > 2030) return;
+  dom.camEditConfirmYear.textContent = String(newYear);
+  dom.camEditConfirm.classList.remove('hidden');
+});
+
+dom.camEditConfirmNo.addEventListener('click', () => {
+  dom.camEditConfirm.classList.add('hidden');
+});
+
+dom.camEditConfirmYes.addEventListener('click', () => {
+  if (!_camCtx) return;
+  const newYear = parseInt(dom.camYearInput.value, 10);
+  if (!newYear || newYear < 1900 || newYear > 2030) return;
+
+  const team = state.teams[_camCtx.teamIndex];
+  const card = team?.cards?.[_camCtx.cardIndex];
+  if (!card) { closeCardActionModal(); return; }
+
+  card.year          = newYear;
+  card.yearUncertain = false;
+  setYearCache(card.id, newYear);
+  setYearConfirmed(card.id, true);
+  setYearUserConfirmed(card.id);
+
+  // Keep the timeline chronologically sorted after a manual correction
+  team.cards.sort((a, b) => a.year - b.year);
+
+  // A card in the current team's timeline may have moved — clear any in-progress
+  // slot selection for a new card so the host re-picks against the updated order.
+  if (_camCtx.teamIndex === currentTeamIndex() && state.phase === 'playing') {
+    state.selectedSlot = null;
+    dom.btnConfirm.classList.add('hidden');
+  }
+
+  closeCardActionModal();
+  _refreshAllTeamViews();
+});
+
+dom.camBtnDelete.addEventListener('click', () => {
+  if (!_camCtx) return;
+  dom.camStepChoose.classList.add('hidden');
+  dom.camDeleteTeamName.textContent = teamLabel(_camCtx.teamIndex, state.teams[_camCtx.teamIndex].name);
+  dom.camStepDelete.classList.remove('hidden');
+});
+
+dom.camDeleteConfirmNo.addEventListener('click', () => {
+  dom.camStepDelete.classList.add('hidden');
+  dom.camStepChoose.classList.remove('hidden');
+});
+
+dom.camDeleteConfirmYes.addEventListener('click', () => {
+  if (!_camCtx) return;
+  const team = state.teams[_camCtx.teamIndex];
+  if (!team) { closeCardActionModal(); return; }
+  team.cards.splice(_camCtx.cardIndex, 1);
+
+  if (_camCtx.teamIndex === currentTeamIndex() && state.phase === 'playing') {
+    state.selectedSlot = null;
+    dom.btnConfirm.classList.add('hidden');
+  }
+
+  closeCardActionModal();
+  _refreshAllTeamViews();
+});
+
+// ─── Add a card manually to a team's deck ─────────────────────────────────────
+
+function openAddCardModal() {
+  dom.acTeam.innerHTML = state.teams.map((t, i) =>
+    `<option value="${i}">${esc(teamLabel(i, t.name))}</option>`).join('');
+  dom.acYear.value   = '';
+  dom.acTitle.value  = '';
+  dom.acArtist.value = '';
+  dom.acError.classList.add('hidden');
+  dom.addCardOverlay.classList.remove('hidden');
+  dom.acYear.focus();
+}
+
+function closeAddCardModal() {
+  dom.addCardOverlay.classList.add('hidden');
+}
+
+dom.btnAddCard.addEventListener('click', openAddCardModal);
+dom.acCancel.addEventListener('click', closeAddCardModal);
+
+dom.acConfirm.addEventListener('click', () => {
+  const teamIndex = parseInt(dom.acTeam.value, 10);
+  const year      = parseInt(dom.acYear.value, 10);
+  const title     = dom.acTitle.value.trim();
+  const artist    = dom.acArtist.value.trim();
+
+  if (!year || year < 1900 || year > 2030) {
+    dom.acError.textContent = 'Please enter a valid year (1900–2030).';
+    dom.acError.classList.remove('hidden');
+    return;
+  }
+  const team = state.teams[teamIndex];
+  if (!team) { closeAddCardModal(); return; }
+
+  const card = {
+    id:            'manual-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8),
+    year,
+    yearUncertain: false,
+    title:  title  || 'Unknown title',
+    artist: artist || 'Unknown artist',
+  };
+
+  // Insert in year order — before the first existing card with a strictly later year
+  let insertAt = team.cards.findIndex(c => c.year > year);
+  if (insertAt === -1) insertAt = team.cards.length;
+  team.cards.splice(insertAt, 0, card);
+
+  if (teamIndex === currentTeamIndex() && state.phase === 'playing') {
+    state.selectedSlot = null;
+    dom.btnConfirm.classList.add('hidden');
+  }
+
+  closeAddCardModal();
+  _refreshAllTeamViews();
+});
 
 
 // ─── Draw a card from the deck ────────────────────────────────────────────────
@@ -1199,6 +1425,14 @@ function renderTimeline(interactive, overrideCards, overrideSlot, onSlotClick) {
         <div class="tc-title">${esc(card.title)}</div>
         <div class="tc-artist">${esc(card.artist)}</div>
       `;
+      if (!card.isStartingCard) {
+        cardEl.classList.add('editable');
+        cardEl.title = 'Click to edit or delete this card';
+        cardEl.addEventListener('click', (e) => {
+          e.stopPropagation();
+          openCardActionModal(currentTeamIndex(), i);
+        });
+      }
       row.appendChild(cardEl);
     }
   }
@@ -1537,7 +1771,7 @@ function restartGame(mode) {
 
   // Deal one starter card to each team
   teams.forEach(team => {
-    if (newDeck.length > 0) team.cards.push(newDeck.shift());
+    if (newDeck.length > 0) team.cards.push({ ...newDeck.shift(), isStartingCard: true });
   });
 
   sessionStorage.setItem('hitster_game', JSON.stringify({

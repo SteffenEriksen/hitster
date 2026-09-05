@@ -469,7 +469,7 @@ async function startGame() {
     // Build shuffled deck and deal one starter card to each team
     const deck = shuffle([...allTracks]);
     teams.forEach(team => {
-      if (deck.length > 0) team.cards.push(deck.shift());
+      if (deck.length > 0) team.cards.push({ ...deck.shift(), isStartingCard: true });
     });
 
     const years = allTracks.map(t => t.year).filter(Boolean);

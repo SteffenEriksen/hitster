@@ -38,6 +38,7 @@
         </div>
         <div class="game-settings-ctl">
           <button id="btn-game-settings" class="btn-game-settings">⚙ Settings</button>
+          <button id="btn-add-card" class="btn-game-settings">➕ Add card</button>
           <span id="hard-mode-badge" class="hard-mode-badge hidden"></span>
         </div>
       </div>
@@ -284,6 +285,77 @@
         <span id="restart-remaining-count" class="restart-option-count"></span>
       </button>
       <button id="btn-restart-cancel" class="btn-ghost btn-restart-cancel">✗ Cancel</button>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════ CARD ACTION OVERLAY (click a placed card) -->
+  <div id="card-action-overlay" class="modal-overlay hidden">
+    <div class="modal-card">
+      <h3 class="modal-title">🎵 Card</h3>
+      <div class="cam-info">
+        <div class="cam-year" id="cam-year"></div>
+        <div class="cam-title" id="cam-title"></div>
+        <div class="cam-artist" id="cam-artist"></div>
+      </div>
+
+      <!-- Step 1: choose action -->
+      <div id="cam-step-choose" class="cam-step">
+        <button id="cam-btn-edit"   class="btn-primary">✎ Edit year</button>
+        <button id="cam-btn-delete" class="btn-danger">🗑 Delete card</button>
+        <button id="cam-btn-cancel" class="btn-ghost">Cancel</button>
+      </div>
+
+      <!-- Step 2a: edit year (needs confirmation) -->
+      <div id="cam-step-edit" class="cam-step hidden">
+        <label class="modal-label" for="cam-year-input">New year</label>
+        <input id="cam-year-input" class="modal-input" type="number" min="1900" max="2030" step="1">
+        <div id="cam-edit-confirm" class="cam-confirm hidden">
+          <span class="cam-confirm-text">Change year to <strong id="cam-edit-confirm-year"></strong>?</span>
+          <div class="modal-actions">
+            <button id="cam-edit-confirm-yes" class="btn-primary btn-sm">✓ Yes, change it</button>
+            <button id="cam-edit-confirm-no"  class="btn-ghost btn-sm">✗ Cancel</button>
+          </div>
+        </div>
+        <div class="modal-actions">
+          <button id="cam-edit-apply" class="btn-primary btn-sm">✓ Update</button>
+          <button id="cam-edit-back"  class="btn-ghost btn-sm">← Back</button>
+        </div>
+      </div>
+
+      <!-- Step 2b: delete (needs confirmation) -->
+      <div id="cam-step-delete" class="cam-step hidden">
+        <p class="cam-confirm-text">Delete this card from <strong id="cam-delete-team-name"></strong>'s deck? This cannot be undone.</p>
+        <div class="modal-actions">
+          <button id="cam-delete-confirm-yes" class="btn-danger btn-sm">🗑 Yes, delete</button>
+          <button id="cam-delete-confirm-no"  class="btn-ghost btn-sm">✗ Cancel</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════ ADD CARD OVERLAY -->
+  <div id="add-card-overlay" class="modal-overlay hidden">
+    <div class="modal-card">
+      <h3 class="modal-title">➕ Add card to a deck</h3>
+
+      <label class="modal-label" for="ac-team">Team</label>
+      <select id="ac-team" class="modal-input"></select>
+
+      <label class="modal-label" for="ac-year">Year *</label>
+      <input id="ac-year" class="modal-input" type="number" min="1900" max="2030" step="1" placeholder="e.g. 1987">
+
+      <label class="modal-label" for="ac-title">Title (optional)</label>
+      <input id="ac-title" class="modal-input" type="text" maxlength="120" placeholder="Song title">
+
+      <label class="modal-label" for="ac-artist">Artist (optional)</label>
+      <input id="ac-artist" class="modal-input" type="text" maxlength="120" placeholder="Artist name">
+
+      <p id="ac-error" class="cam-error hidden"></p>
+
+      <div class="modal-actions">
+        <button id="ac-confirm" class="btn-primary">➕ Add card</button>
+        <button id="ac-cancel"  class="btn-ghost">Cancel</button>
+      </div>
     </div>
   </div>
 

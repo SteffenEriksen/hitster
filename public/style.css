@@ -1534,6 +1534,25 @@ button { cursor: pointer; font-family: inherit; border: none; outline: none; }
 .timeline-card .tc-title { font-size: 0.6rem; font-weight: 700; line-height: 1.2; color: var(--grey-800); overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
 .timeline-card .tc-artist{ font-size: 0.55rem; color: var(--grey-600); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 
+/* Placed cards that can be clicked to edit/delete (all but each team's starting card) */
+.timeline-card.editable, .otr-card.editable {
+  cursor: pointer;
+  transition: transform 0.12s, box-shadow 0.12s;
+}
+.timeline-card.editable:hover, .otr-card.editable:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(0,0,0,0.18);
+}
+.timeline-card.editable::after, .otr-card.editable::after {
+  content: '✎';
+  position: absolute;
+  top: 2px;
+  right: 4px;
+  font-size: 0.55rem;
+  opacity: 0.35;
+}
+.timeline-card, .otr-card { position: relative; }
+
 /* Larger cards for the active team's main timeline */
 .timeline-card.large {
   width: 110px;
@@ -2424,3 +2443,69 @@ button { cursor: pointer; font-family: inherit; border: none; outline: none; }
 .qr-card { background: #fff; border-radius: 16px; padding: 24px; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 10px; }
 .qr-title { font-weight: 700; font-size: 1rem; color: #111; margin: 0; }
 .qr-url { font-size: 0.7rem; color: #666; word-break: break-all; max-width: 220px; margin: 0; }
+
+/* ─── Generic modal overlay (card edit/delete, add card) ───────────────────── */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.65);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 250;
+  padding: 24px;
+  backdrop-filter: blur(4px);
+}
+.modal-card {
+  background: #fff;
+  border-radius: 20px;
+  padding: 28px 24px;
+  max-width: 380px;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  box-shadow: 0 24px 60px rgba(0,0,0,0.35);
+  max-height: 90vh;
+  overflow-y: auto;
+}
+.modal-title { font-size: 1.1rem; font-weight: 800; color: #111827; margin: 0; }
+.modal-label { font-size: 0.78rem; font-weight: 700; color: #6b7280; margin: 4px 0 -6px; }
+.modal-input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 2px solid #e5e7eb;
+  border-radius: 10px;
+  font-size: 0.95rem;
+  font-family: inherit;
+  box-sizing: border-box;
+}
+.modal-input:focus { outline: none; border-color: var(--green, #007272); }
+.modal-actions { display: flex; gap: 10px; margin-top: 4px; }
+.modal-actions .btn-primary, .modal-actions .btn-ghost, .modal-actions .btn-danger { flex: 1; }
+
+.btn-danger {
+  background: #dc2626;
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  padding: 11px 16px;
+  font-weight: 700;
+  font-size: 0.9rem;
+  cursor: pointer;
+  font-family: inherit;
+}
+.btn-danger:hover { background: #b91c1c; }
+
+/* Card-action popup (choose edit/delete for a placed card) */
+.cam-info { text-align: center; padding: 8px 0; border-bottom: 1px solid #f0f0f0; margin-bottom: 4px; }
+.cam-year   { font-size: 1.6rem; font-weight: 900; color: var(--green, #007272); }
+.cam-title  { font-size: 0.95rem; font-weight: 700; color: #111827; }
+.cam-artist { font-size: 0.82rem; color: #6b7280; }
+.cam-step { display: flex; flex-direction: column; gap: 10px; }
+.cam-step.hidden { display: none; }
+.cam-confirm { display: flex; flex-direction: column; gap: 8px; background: #fef2f2; border-radius: 10px; padding: 10px 12px; margin-top: 4px; }
+.cam-confirm.hidden { display: none; }
+.cam-confirm-text { font-size: 0.85rem; color: #374151; line-height: 1.4; }
+.cam-error { font-size: 0.8rem; color: #dc2626; margin: 0; }
+.cam-error.hidden { display: none; }
