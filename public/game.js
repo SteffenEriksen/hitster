@@ -257,39 +257,16 @@ let _savedVolume    = null;   // volume_percent to restore ( null = unknown/neve
 let _sessionMuted   = false;  // true while we're holding the session open via mute
 let _repeatEnsured  = false;  // true once we've set repeat=track for this Spotify session
 
-async function ensureRepeatTrack() {
-  if (_repeatEnsured || !personalSpotify.isConnected()) return;
-  try {
-    await spotifySetRepeat('track');
-    _repeatEnsured = true;
-  } catch (_) {
-    // Not all devices support repeat mode — harmless if it fails, we just lose the
-    // auto-restart-on-end behaviour on that device.
-  }
-}
+// Keepalive (mute + repeat=track) disabled: it broke playback on several devices.
+// Back to plain pause/play between turns.
+async function ensureRepeatTrack() {}
 
 async function holdSpotifySession() {
   if (!personalSpotify.isConnected()) return;
-  try {
-    if (_savedVolume === null) {
-      const pb = await spotifyGetPlaybackState();
-      if (pb && typeof pb.device?.volume_percent === 'number') _savedVolume = pb.device.volume_percent;
-    }
-    await spotifySetVolume(0);
-    _sessionMuted = true;
-  } catch (_) {
-    // Device doesn't support volume control (e.g. some smart speakers) — fall back
-    // to a real pause rather than leaving it playing at full volume.
-    try { await spotifyPause(); } catch (_) {}
-  }
+  try { await spotifyPause(); } catch (_) {}
 }
 
-async function releaseSpotifySession() {
-  if (!_sessionMuted) return;
-
-  try { await spotifySetVolume(_savedVolume ?? 70); } catch (_) {}
-  _sessionMuted = false;
-}
+async function releaseSpotifySession() {}
 
 
 function startProgress(durationMs) {
