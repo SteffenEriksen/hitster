@@ -191,10 +191,15 @@ const personalSpotify = {
 // ─── Playback wrappers ────────────────────────────────────────────────────────
 // If personal Spotify is connected it is used exclusively — no silent fallback.
 
-async function spotifyPlay(uri) {
+// Spotify now ignores {uris:[…]} (returns 204, plays nothing). Playing the track inside
+// its album context with an offset works, so prefer that and fall back to uris.
+async function spotifyPlay(uri, albumUri) {
   if (!personalSpotify.isConnected()) throw new Error('No Spotify account connected.');
+  const body = albumUri
+    ? { context_uri: albumUri, offset: { uri } }
+    : { uris: [uri] };
   const res = await personalSpotify.spotifyFetch('https://api.spotify.com/v1/me/player/play', {
-    method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ uris: [uri] }),
+    method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
   });
   if (res && res.ok) return;
   if (!res) throw new Error('Could not reach Spotify — check your connection.');
@@ -424,6 +429,7 @@ function clientFormatTrack(t) {
     titleSuspect,
     isrc:        t.external_ids?.isrc || null,
     uri:         t.uri,
+    albumUri:    t.album?.uri || null,
     albumArt:    t.album?.images?.[0]?.url || '',
     duration:    t.duration_ms || 0,
   };
@@ -441,7 +447,7 @@ function isAllowedPlaylist(name) {
 
 /** Fetch all tracks for a playlist using the personal PKCE token. */
 async function fetchPersonalTracks(playlistId) {
-  const fields = 'items(track(id,name,artists,album(name,images,release_date,album_type),uri,duration_ms,external_ids)),next';
+  const fields = 'items(track(id,name,artists,album(id,uri,name,images,release_date,album_type),uri,duration_ms,external_ids)),next';
   const url    = `https://api.spotify.com/v1/playlists/${playlistId}/tracks?limit=100&fields=${encodeURIComponent(fields)}`;
   const items  = await personalSpotify.pagedGet(url);
   return items

@@ -326,6 +326,7 @@ function formatTrack(t) {
     titleSuspect, // true = title is a variant (re-recorded, remix, live…) — MB year unreliable
     isrc:         t.external_ids?.isrc || null,
     uri:          t.uri,
+    albumUri:     t.album?.uri || null,
     albumArt:     t.album?.images?.[0]?.url || '',
     duration:     t.duration_ms || 0,
   };
@@ -508,7 +509,7 @@ app.get('/api/playlist/:id/tracks', async (req, res) => {
 
     // Collect raw Spotify track objects (album_type needed for suspect flag)
     while (rawTracks.length < max) {
-      const fields = 'items(track(id,name,artists,album(name,images,release_date,album_type),uri,duration_ms,external_ids)),next';
+      const fields = 'items(track(id,name,artists,album(id,uri,name,images,release_date,album_type),uri,duration_ms,external_ids)),next';
       const data   = await spotifyGet(`/playlists/${id}/tracks?limit=${limit}&offset=${offset}&fields=${encodeURIComponent(fields)}`);
       const items  = data.items || [];
       for (const item of items) {

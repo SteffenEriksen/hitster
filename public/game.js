@@ -959,7 +959,7 @@ async function beginTurn() {
 
   try {
     await releaseSpotifySession();   // restore volume if we were holding the session open
-    await spotifyPlay(card.uri);
+    await spotifyPlay(card.uri, card.albumUri);
     state.isPlaying = true;
     ensureRepeatTrack();   // fire-and-forget: loop this track so it auto-restarts on natural end
 
@@ -1939,7 +1939,7 @@ dom.btnRetryPlay.addEventListener('click', async () => {
   dom.nowPlayingInfo.textContent = '↺ Retrying…';
   try {
     await releaseSpotifySession();
-    await spotifyPlay(state.currentCard.uri);
+    await spotifyPlay(state.currentCard.uri, state.currentCard.albumUri);
     state.isPlaying = true;
     ensureRepeatTrack();
     dom.btnPauseResume.textContent = '⏸ Pause';
