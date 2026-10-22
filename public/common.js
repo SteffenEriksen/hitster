@@ -191,61 +191,15 @@ const personalSpotify = {
 // ─── Playback wrappers ────────────────────────────────────────────────────────
 // If personal Spotify is connected it is used exclusively — no silent fallback.
 
-async function _spotifyPlayRaw(uri, deviceId) {
-  const q = deviceId ? '?device_id=' + encodeURIComponent(deviceId) : '';
-  const res = await personalSpotify.spotifyFetch('https://api.spotify.com/v1/me/player/play' + q, {
+async function spotifyPlay(uri) {
+  if (!personalSpotify.isConnected()) throw new Error('No Spotify account connected.');
+  const res = await personalSpotify.spotifyFetch('https://api.spotify.com/v1/me/player/play', {
     method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ uris: [uri] }),
   });
   if (res && res.ok) return;
   if (!res) throw new Error('Could not reach Spotify — check your connection.');
   const json = await res.json().catch(() => ({}));
   throw new Error(json.error?.message || 'Spotify playback error (' + res.status + ')');
-}
-
-async function _spotifyWaitPlaying() {
-  // Poll briefly: state lags the play command. Returns last player state seen.
-  let pb = null;
-  for (let i = 0; i < 4; i++) {
-    await new Promise(r => setTimeout(r, 500));
-    pb = await spotifyGetPlaybackState();
-    if (pb && pb.is_playing) return pb;
-  }
-  return pb;
-}
-
-async function spotifyPlay(uri) {
-  if (!personalSpotify.isConnected()) throw new Error('No Spotify account connected.');
-  await _spotifyPlayRaw(uri);
-  let pb = await _spotifyWaitPlaying();
-  console.log('[spotify] state after play:', pb && { playing: pb.is_playing, device: pb.device?.name,
-    volume: pb.device?.volume_percent, restricted: pb.device?.is_restricted, item: pb.item?.name });
-
-  if (!pb || !pb.is_playing) {
-    // 2xx but nothing playing: device dropped the command. Wake it and retry.
-    console.warn('[spotify] play not confirmed, transferring device and retrying');
-    const res = await personalSpotify.spotifyFetch('https://api.spotify.com/v1/me/player/devices');
-    const data = res && res.ok ? await res.json().catch(() => ({})) : {};
-    const devices = data.devices || [];
-    console.log('[spotify] devices:', devices.map(d => ({ name: d.name, type: d.type, active: d.is_active, vol: d.volume_percent })));
-    const dev = devices.find(d => d.is_active) || devices[0];
-    if (!dev) throw new Error('No Spotify device available — open Spotify on a device and try again.');
-    await personalSpotify.spotifyFetch('https://api.spotify.com/v1/me/player', {
-      method: 'PUT', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ device_ids: [dev.id], play: true }),
-    });
-    await new Promise(r => setTimeout(r, 800));
-    await _spotifyPlayRaw(uri, dev.id);
-    pb = await _spotifyWaitPlaying();
-    if (!pb || !pb.is_playing) {
-      throw new Error('Spotify did not start playback on "' + dev.name + '". Tap play in Spotify, then Retry.');
-    }
-  }
-
-  // Volume stuck at 0 (left over from the mute keepalive before a page reload) = silence.
-  if (pb.device && pb.device.volume_percent === 0) {
-    console.warn('[spotify] device volume was 0, restoring');
-    try { await spotifySetVolume(70); } catch (_) {}
-  }
 }
 
 async function spotifyPause() {
