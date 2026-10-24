@@ -333,6 +333,24 @@
     </div>
   </div>
 
+  <!-- ══════════════════════════════════════ MISSED CARDS OVERLAY -->
+  <div id="missed-overlay" class="modal-overlay hidden">
+    <div class="modal-card">
+      <h3 class="modal-title" id="missed-title">Missed cards</h3>
+      <div id="missed-list" class="missed-list"></div>
+      <div id="missed-confirm" class="missed-confirm hidden">
+        <p id="missed-confirm-text" class="missed-confirm-text"></p>
+        <div class="modal-actions">
+          <button id="missed-confirm-yes" class="btn-primary">✓ Yes, add card</button>
+          <button id="missed-confirm-no"  class="btn-ghost">Cancel</button>
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button id="missed-close" class="btn-ghost">Close</button>
+      </div>
+    </div>
+  </div>
+
   <!-- ══════════════════════════════════════ ADD CARD OVERLAY -->
   <div id="add-card-overlay" class="modal-overlay hidden">
     <div class="modal-card">

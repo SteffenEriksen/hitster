@@ -188,6 +188,7 @@ const state = {
                            // kept around (even after the steal window closes) so a later year
                            // correction can undo/redo the steal outcome — cleared on a new card.
 
+  missedLog:      [],     // in-order log of cards a team missed: [{ id, teamIndex, kind, card, restored }]
   _blindSteal:    false,  // true = steal was pre-registered; card stays hidden until steal resolves
   _cardClaimedByOriginal: false, // true = a year correction proved the original guess right while
                                   // a steal was still queued/in-progress — that attempt is now void,
@@ -345,7 +346,7 @@ function renderScoreChips() {
     const active = i === curIdx;
     const inGame = !state.isTiebreaker || state.activeTeams.includes(i);
     if (!inGame) return '';
-    return `<span class="score-chip${active ? ' active' : ''}">${esc(teamLabel(i, t.name))}: ${t.cards.length}</span>`;
+    return `<span class="score-chip${active ? ' active' : ''}"><span class="team-link" data-log-team="${i}" title="Show missed cards">${esc(teamLabel(i, t.name))}</span>: ${t.cards.length}</span>`;
   }).join('');
 }
 
@@ -360,7 +361,7 @@ function renderCurrentTeamBar() {
     state.teams.some(t => t.cards.length >= state.cardsToWin);
   dom.currentTeamBar.innerHTML =
     `<span class="ctb-label">Now playing</span>` +
-    `<span class="ctb-name">${esc(teamLabel(idx, team.name))}</span>` +
+    `<span class="ctb-name team-link" data-log-team="${idx}" title="Show missed cards">${esc(teamLabel(idx, team.name))}</span>` +
     `<span class="ctb-count">${team.cards.length} card${team.cards.length !== 1 ? 's' : ''}</span>` +
     (showMp ? `<span class="mp-badge">🎯 Match Point</span>` : '');
 }
@@ -380,7 +381,7 @@ function renderOtherTeams() {
           </div>`;
         }).join('');
     return `<div class="other-team-row">
-      <span class="otr-name">${esc(teamLabel(i, t.name))}</span>
+      <span class="otr-name team-link" data-log-team="${i}" title="Show missed cards">${esc(teamLabel(i, t.name))}</span>
       <div class="otr-cards">${cardsHtml}</div>
     </div>`;
   }).join('');
@@ -579,6 +580,130 @@ dom.acConfirm.addEventListener('click', () => {
   _refreshAllTeamViews();
 });
 
+
+
+// ─── Missed-cards log ─────────────────────────────────────────────────────────
+// Records, in order, every card a team missed: a wrong placement on its own turn, a failed
+// steal attempt, and a card lost to a failed-steal penalty. The host can overrule any entry
+// (after a confirmation) to put the card into the team's deck.
+
+const MISS_KINDS = {
+  wrong:   { label: 'Wrong placement', cls: 'wrong' },
+  steal:   { label: 'Failed steal',    cls: 'steal' },
+  penalty: { label: 'Lost to penalty', cls: 'penalty' },
+};
+let _missSeq = 0;
+let _missedTeam = null;   // team index currently shown in the popup
+let _missedPending = null; // log entry awaiting overrule confirmation
+
+function _logMiss(kind, teamIndex, card) {
+  if (!card) return null;
+  const id = ++_missSeq;
+  state.missedLog.push({ id, teamIndex, kind, card, restored: false });
+  return id;
+}
+
+function _unlogMiss(ids) {
+  if (!ids || !ids.length) return;
+  state.missedLog = state.missedLog.filter(e => !ids.includes(e.id));
+}
+
+/** Keep the "wrong placement" entry for the current card in step with a year correction/overturn. */
+function _syncWrongLog(card, teamIndex, isWrong) {
+  const existing = state.missedLog.find(e => e.kind === 'wrong' && e.card === card && e.teamIndex === teamIndex);
+  if (isWrong && !existing) _logMiss('wrong', teamIndex, card);
+  if (!isWrong && existing) _unlogMiss([existing.id]);
+}
+
+function _cardHolder(card) {
+  return state.teams.findIndex(t => t.cards.includes(card));
+}
+
+function openMissedModal(teamIndex) {
+  _missedTeam = teamIndex;
+  _missedPending = null;
+  $('missed-confirm').classList.add('hidden');
+  renderMissedModal();
+  $('missed-overlay').classList.remove('hidden');
+}
+
+function closeMissedModal() {
+  $('missed-overlay').classList.add('hidden');
+  _missedTeam = null;
+  _missedPending = null;
+}
+
+function renderMissedModal() {
+  const team = state.teams[_missedTeam];
+  if (!team) return;
+  $('missed-title').textContent = 'Missed cards — ' + teamLabel(_missedTeam, team.name);
+  const entries = state.missedLog.filter(e => e.teamIndex === _missedTeam);
+  if (entries.length === 0) {
+    $('missed-list').innerHTML = '<div class="missed-empty">No missed cards yet.</div>';
+    return;
+  }
+  $('missed-list').innerHTML = entries.map(e => {
+    const k = MISS_KINDS[e.kind];
+    // Don't spoil a face-down card during a blind steal
+    const hidden = e.card === state.currentCard && (state._blindSteal || state.phase === 'playing');
+    const c = e.card;
+    const holder = !e.restored ? _cardHolder(c) : -1;
+    const stolenNote = holder !== -1 && holder !== e.teamIndex && e.kind !== 'penalty'
+      ? ` → now with ${esc(teamLabel(holder, state.teams[holder].name))}` : '';
+    return `<div class="missed-item${e.restored ? ' restored' : ''}">
+      <div class="missed-year" style="color:${hidden ? '#6b7280' : getDecadeVibe(c.year).color}">${hidden ? '?' : (c.yearUncertain ? '~' : '') + c.year}</div>
+      <div class="missed-info">
+        <div class="missed-song">${hidden ? 'Hidden until the steal resolves' : esc(c.title) + ' – ' + esc(c.artist)}</div>
+        <span class="missed-badge ${k.cls}">${k.label}</span>${e.restored ? ' <span class="missed-badge done">Restored</span>' : ''}${stolenNote ? `<span class="missed-song" style="font-weight:500;font-size:0.75rem">${stolenNote}</span>` : ''}
+      </div>
+      ${e.restored || hidden ? '' : `<button class="btn-ghost btn-sm" data-overrule="${e.id}">Overrule</button>`}
+    </div>`;
+  }).join('');
+}
+
+function _startOverrule(entryId) {
+  const e = state.missedLog.find(x => x.id === entryId);
+  if (!e || e.restored) return;
+  _missedPending = e;
+  const team = state.teams[e.teamIndex];
+  const holder = _cardHolder(e.card);
+  const move = holder !== -1 && holder !== e.teamIndex
+    ? ` It will be removed from ${teamLabel(holder, state.teams[holder].name)}.` : '';
+  $('missed-confirm-text').textContent =
+    `Add "${e.card.title}" (${e.card.year}) to ${teamLabel(e.teamIndex, team.name)}'s deck?${move}`;
+  $('missed-confirm').classList.remove('hidden');
+}
+
+function _confirmOverrule() {
+  const e = _missedPending;
+  if (!e) return;
+  const team = state.teams[e.teamIndex];
+  // Take the card from whoever holds it now (e.g. a stealer who won it)
+  state.teams.forEach(t => {
+    const i = t.cards.indexOf(e.card);
+    if (i !== -1) t.cards.splice(i, 1);
+  });
+  team.cards.push(e.card);
+  team.cards.sort((a, b) => a.year - b.year);
+  e.restored = true;
+  _missedPending = null;
+  $('missed-confirm').classList.add('hidden');
+  renderMissedModal();
+  _refreshAllTeamViews();
+}
+
+document.addEventListener('click', (ev) => {
+  const link = ev.target.closest('[data-log-team]');
+  if (link) { openMissedModal(parseInt(link.dataset.logTeam, 10)); return; }
+  const btn = ev.target.closest('[data-overrule]');
+  if (btn) _startOverrule(parseInt(btn.dataset.overrule, 10));
+});
+$('missed-close').addEventListener('click', closeMissedModal);
+$('missed-confirm-no').addEventListener('click', () => {
+  _missedPending = null;
+  $('missed-confirm').classList.add('hidden');
+});
+$('missed-confirm-yes').addEventListener('click', _confirmOverrule);
 
 // ─── Draw a card from the deck ────────────────────────────────────────────────
 
@@ -1114,6 +1239,7 @@ function finishPlacement(correct, slot, fromHardMode = false) {
   } else {
     dom.resultBanner.className = 'result-banner wrong';
     dom.resultText.textContent = isBlindSteal ? '✗ Wrong! Steal in progress…' : '✗ Wrong! Card discarded.';
+    _syncWrongLog(card, currentTeamIndex(), true);
     if (fromHardMode) {
       state.pendingOverturnSlot = slot;
       dom.overturnTeamName.textContent = teamLabel(currentTeamIndex(), team.name);
@@ -1156,6 +1282,7 @@ function overturnPlacement() {
   const team = currentTeam();
   team.cards.splice(slot, 0, state.currentCard);
   state.pendingOverturnSlot = null;
+  _syncWrongLog(state.currentCard, currentTeamIndex(), false);
   dom.overturnSection.classList.add('hidden');
   dom.resultBanner.className = 'result-banner correct';
   dom.resultText.textContent = '↩ Overturned! Card awarded to ' + teamLabel(currentTeamIndex(), team.name) + '.';
@@ -1169,10 +1296,11 @@ function overturnPlacement() {
 /** Reverse the card-count effect of one resolved steal attempt (used before a replay). */
 function _undoStealHistoryEntry(entry, card) {
   const stealTeam = state.teams[entry.teamIndex];
+  _unlogMiss(entry.logIds);
   if (entry.correct) {
     const idx = stealTeam.cards.indexOf(card);
     if (idx !== -1) stealTeam.cards.splice(idx, 1);
-  } else if (entry.poppedCard) {
+  } else if (entry.poppedCard && !stealTeam.cards.includes(entry.poppedCard)) {
     stealTeam.cards.push(entry.poppedCard);
     stealTeam.cards.sort((a, b) => a.year - b.year);
   }
@@ -1201,7 +1329,12 @@ function _replayStealHistory(attempts, card, cards, year) {
       poppedCard = stealTeam.cards[stealTeam.cards.length - 1];
       stealTeam.cards.pop();
     }
-    newHistory.push({ teamIndex: entry.teamIndex, slot: entry.slot, correct, poppedCard });
+    const logIds = [];
+    if (!correct) {
+      logIds.push(_logMiss('steal', entry.teamIndex, card));
+      if (poppedCard) logIds.push(_logMiss('penalty', entry.teamIndex, poppedCard));
+    }
+    newHistory.push({ teamIndex: entry.teamIndex, slot: entry.slot, correct, poppedCard, logIds });
   }
   return newHistory;
 }
@@ -1252,7 +1385,10 @@ function applyYearCorrection(newYear) {
       stealNote = ' Waiting for the in-progress steal — it will have no effect.';
     } else if (hadStealHistory) {
       // Already resolved earlier — void it now, nothing left to wait for.
-      stealNote = ' Steal voided — card returns to the original team.';
+      // Failed stealers' penalties were refunded above; also cancel any stealers still queued
+      // so they can't attempt (and be penalised) on a card the original team actually won.
+      if (state._stealPhase === 'result') closeStealWindow();
+      stealNote = ' Steal voided — card returns to the original team, steal penalties refunded.';
     }
   } else if (hadStealHistory) {
     // Still wrong — re-check the already-resolved steal attempt(s) against the corrected year.
@@ -1263,6 +1399,7 @@ function applyYearCorrection(newYear) {
       : ' Steal outcome re-checked against the corrected year.';
   }
 
+  _syncWrongLog(card, currentTeamIndex(), !correct);
   _syncSkipStealButton();
 
   if (correct && !deferAward) {
@@ -1578,7 +1715,12 @@ function confirmSteal() {
   }
 
   // Remember this attempt so a later year correction can undo/redo it against the corrected year
-  state._stealHistory.push({ teamIndex: stealer.teamIndex, slot, correct, poppedCard });
+  const logIds = [];
+  if (!correct) {
+    logIds.push(_logMiss('steal', stealer.teamIndex, state.currentCard));
+    if (poppedCard) logIds.push(_logMiss('penalty', stealer.teamIndex, poppedCard));
+  }
+  state._stealHistory.push({ teamIndex: stealer.teamIndex, slot, correct, poppedCard, logIds });
 
   dom.resultBanner.classList.remove('hidden');
   renderTimeline(false, currentTeam().cards, null, null); // keep showing current team's deck

@@ -2509,3 +2509,45 @@ button { cursor: pointer; font-family: inherit; border: none; outline: none; }
 .cam-confirm-text { font-size: 0.85rem; color: #374151; line-height: 1.4; }
 .cam-error { font-size: 0.8rem; color: #dc2626; margin: 0; }
 .cam-error.hidden { display: none; }
+
+
+/* ─── Missed-cards log ─────────────────────────────────────────────────────── */
+.team-link { cursor: pointer; text-decoration: underline dotted; text-underline-offset: 3px; }
+.team-link:hover { opacity: 0.8; }
+.missed-list { display: flex; flex-direction: column; gap: 8px; }
+.missed-empty { color: #6b7280; font-size: 0.9rem; text-align: center; padding: 12px 0; }
+.missed-item { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border: 2px solid #e5e7eb; border-radius: 12px; }
+.missed-item.restored { opacity: 0.55; }
+.missed-year { font-weight: 800; font-size: 1.05rem; min-width: 3.2em; }
+.missed-info { flex: 1; min-width: 0; }
+.missed-song { font-weight: 700; font-size: 0.9rem; color: #111827; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.missed-badge { display: inline-block; font-size: 0.7rem; font-weight: 700; padding: 2px 8px; border-radius: 999px; margin-top: 2px; }
+.missed-badge.wrong   { background: #fee2e2; color: #b91c1c; }
+.missed-badge.steal   { background: #fef3c7; color: #b45309; }
+.missed-badge.penalty { background: #ede9fe; color: #6d28d9; }
+.missed-badge.done    { background: #d1fae5; color: #047857; }
+.missed-confirm { border: 2px solid var(--green, #007272); border-radius: 12px; padding: 10px; }
+.missed-confirm-text { margin: 0 0 8px; font-size: 0.9rem; color: #111827; }
+
+/* ─── Game screen: always scrollable, continue buttons pinned at the bottom ─── */
+html, body { height: auto; min-height: 100%; }
+body { overflow-y: auto; }
+#screen-game {
+  flex-shrink: 0;            /* never squash the screen to the viewport height */
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+/* Don't clip or shrink content — let the page scroll instead */
+.timeline-section { flex: 0 0 auto; overflow: visible; }
+.card-area > * { flex-shrink: 0; }           /* stop banner/steal/year blocks overlapping */
+.other-teams { max-height: 40vh; }
+.result-banner { position: static; text-align: center; }
+/* Action buttons stay visible at the bottom of the viewport */
+#screen-game > .game-footer {
+  position: sticky;
+  bottom: 0;
+  z-index: 60;
+  margin-top: auto;          /* sit at the bottom when content is short */
+  padding-bottom: max(24px, env(safe-area-inset-bottom));
+  box-shadow: 0 -4px 16px rgba(0,0,0,0.12);
+}
