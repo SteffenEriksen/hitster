@@ -340,6 +340,9 @@
       <div id="missed-list" class="missed-list"></div>
       <div id="missed-confirm" class="missed-confirm hidden">
         <p id="missed-confirm-text" class="missed-confirm-text"></p>
+        <label class="modal-label" for="missed-year">Year (edit if wrong)</label>
+        <input id="missed-year" class="modal-input" type="number" min="1900" max="2030" step="1">
+        <p id="missed-year-error" class="cam-error hidden">Please enter a valid year (1900–2030).</p>
         <div class="modal-actions">
           <button id="missed-confirm-yes" class="btn-primary">✓ Yes, add card</button>
           <button id="missed-confirm-no"  class="btn-ghost">Cancel</button>

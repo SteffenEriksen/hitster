@@ -670,13 +670,27 @@ function _startOverrule(entryId) {
   const move = holder !== -1 && holder !== e.teamIndex
     ? ` It will be removed from ${teamLabel(holder, state.teams[holder].name)}.` : '';
   $('missed-confirm-text').textContent =
-    `Add "${e.card.title}" (${e.card.year}) to ${teamLabel(e.teamIndex, team.name)}'s deck?${move}`;
+    `Add "${e.card.title}" to ${teamLabel(e.teamIndex, team.name)}'s deck?${move}`;
+  $('missed-year').value = e.card.year;
+  $('missed-year-error').classList.add('hidden');
   $('missed-confirm').classList.remove('hidden');
 }
 
 function _confirmOverrule() {
   const e = _missedPending;
   if (!e) return;
+  const newYear = parseInt($('missed-year').value, 10);
+  if (!newYear || newYear < 1900 || newYear > 2030) {
+    $('missed-year-error').classList.remove('hidden');
+    return;
+  }
+  if (newYear !== e.card.year) {
+    e.card.year          = newYear;
+    e.card.yearUncertain = false;
+    setYearCache(e.card.id, newYear);
+    setYearConfirmed(e.card.id, true);
+    setYearUserConfirmed(e.card.id);
+  }
   const team = state.teams[e.teamIndex];
   // Take the card from whoever holds it now (e.g. a stealer who won it)
   state.teams.forEach(t => {
